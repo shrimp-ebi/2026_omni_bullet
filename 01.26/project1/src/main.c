@@ -45,7 +45,7 @@ Image* generate_gaze_image(Image *input, int u_g, int v_g, int u_s, int v_s) {
     matrix_print("  回転行列R", R);
     
     /* 回転行列の転置（逆回転用） */
-    // Matrix3x3 R_T = matrix_transpose(R);
+    Matrix3x3 R_T = matrix_transpose(R);  // ← コメントアウトを解除
     
     /* 出力画像を作成 */
     printf("\n【ステップ4】注視画像の生成\n");
@@ -72,8 +72,8 @@ Image* generate_gaze_image(Image *input, int u_g, int v_g, int u_s, int v_s) {
             /* 1. 出力画素を世界座標に変換 */
             Vector3D X_prime = image_to_world(u_out, v_out, W, H);
 
-            /* 2. 回転: X = R × X' */
-            Vector3D X = matrix_vector_multiply(R, X_prime);
+            /* 2. 回転: X = R^T × X' */
+            Vector3D X = matrix_vector_multiply(R_T, X_prime);  // ← R を R_T に変更
             
             /* 3. 世界座標を画像座標に変換 */
             double u_in, v_in;
