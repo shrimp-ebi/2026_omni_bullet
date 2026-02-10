@@ -85,11 +85,11 @@ Matrix3x3 create_y_rotation_matrix(double psi_deg) {
    */
   R.m[0][0] = cos_psi;
   R.m[0][1] = 0.0;
-  R.m[0][2] = sin_psi;
+  R.m[0][2] = -sin_psi;
   R.m[1][0] = 0.0;
   R.m[1][1] = 1.0;
   R.m[1][2] = 0.0;
-  R.m[2][0] = -sin_psi;
+  R.m[2][0] = sin_psi;
   R.m[2][1] = 0.0;
   R.m[2][2] = cos_psi;
 
@@ -251,14 +251,14 @@ double compute_analytical_derivative(Image *base, Image *ref, double psi_deg,
       /* diff = Sr - Sb */
       double diff = gray_ref - gray_base;
 
-      /* ===== dX'/dψ, dY'/dψ, dZ'/dψ （この回転行列に整合） =====
-         X' =  X cosψ + Z sinψ
+      /* ===== dX'/dψ, dY'/dψ, dZ'/dψ （式11, 12, 13） =====
+         X' =  X cosψ - Z sinψ
          Y' =  Y
-         Z' = -X sinψ + Z cosψ
+         Z' =  X sinψ + Z cosψ
       */
-      double dX_dpsi = -X.x * sin_psi + X.z * cos_psi;
+      double dX_dpsi = -X.x * sin_psi - X.z * cos_psi;
       double dY_dpsi = 0.0;
-      double dZ_dpsi = -X.x * cos_psi - X.z * sin_psi;
+      double dZ_dpsi = X.x * cos_psi - X.z * sin_psi;
 
       /* ===== 参照画像の微分：∂S/∂θ, ∂S/∂φ ===== */
       double dS_dtheta, dS_dphi;
