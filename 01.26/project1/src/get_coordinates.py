@@ -42,7 +42,7 @@ if __name__ == "__main__":
     
     # 入力・出力フォルダ
     input_dir = os.path.join(project_root, "images", "input")
-    output_dir = os.path.join(project_root, "images", "output")
+    output_dir = os.path.join(project_root, "images", "base")
     
     # フォルダ確認
     if not os.path.exists(input_dir):

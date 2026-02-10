@@ -140,13 +140,22 @@ Image* image_create_like(Image *src) {
  * 画素値の取得・設定
  * =========================== */
 
-/* 画素値を取得 */
+/* 【修正版】画素値を取得（周期境界条件対応）
+ * 
+ * 全方位画像は水平方向(u方向)が周期的
+ * - u座標: 周期境界（左端と右端がつながる）
+ * - v座標: 通常の境界（上下は範囲外で0）
+ */
 void get_pixel(Image *img, int u, int v, uint8_t *rgb) {
-    /* 範囲チェック */
-    if (u < 0 || u >= img->width || v < 0 || v >= img->height) {
+    /* v座標の範囲チェック（上下は周期的でない） */
+    if (v < 0 || v >= img->height) {
         rgb[0] = rgb[1] = rgb[2] = 0;
         return;
     }
+    
+    /* 【修正】u座標は周期境界条件を適用 */
+    while (u < 0) u += img->width;
+    while (u >= img->width) u -= img->width;
     
     /* データ配列のインデックス計算 */
     int index = (v * img->width + u) * img->channels;
