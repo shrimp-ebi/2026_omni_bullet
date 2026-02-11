@@ -21,8 +21,8 @@
  * 入力: (u, v) - 画像座標、W, H - 画像サイズ
  * 出力: (θ, φ) - 角度座標（ラジアン）
  * 
- * 式(1): θ = (u - W/2) * 2π/W
- *        φ = (H/2 - v) * π/H
+ * 式(1): θ  = (u - W/2) * 2π/W
+ *        φ = -(v - H) * π/H
  */
 void image_to_angle(int u, int v, int W, int H, 
                     double *theta, double *phi);
@@ -33,7 +33,7 @@ void image_to_angle(int u, int v, int W, int H,
  * 出力: (u, v) - 画像座標
  * 
  * 式(2): u = (θ + π) * W/(2π)
- *        v = (π/2 - φ) * H/π
+ *        v = -(φ - π) * H/π
  */
 void angle_to_image(double theta, double phi, int W, int H,
                     int *u, int *v);

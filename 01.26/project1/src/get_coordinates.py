@@ -81,9 +81,9 @@ if __name__ == "__main__":
     
     # 出力画像名を設定
     print(f"\n入力画像: {selected_image_name}")
-    output_image_name = input(f"出力画像名 (デフォルト: output.jpg): ").strip()
+    output_image_name = input(f"出力画像名 (デフォルト: base.jpg): ").strip()
     if not output_image_name:
-        output_image_name = "output.jpg"
+        output_image_name = "base.jpg"
     
     # 拡張子確認
     if not output_image_name.endswith(('.jpg', '.jpeg', '.png')):
