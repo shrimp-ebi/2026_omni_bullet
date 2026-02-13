@@ -2,14 +2,14 @@
  * Y軸回りの1パラメータ検証実験
  * 
  * 目的:
- *   1. 目的関数E(ψ)が5度で最小値をとることを確認
+ *   1. 目的関数E(ψ)が期待角度で最小値をとることを確認
  *   2. 理論微分と数値微分が一致することを確認
  * 
  * 使い方:
- *   ./validate_y_rotation <基準画像> <参照画像>
+ *   ./validate_y_rotation <基準画像> <参照画像> [期待角度(度)]
  * 
  * 例:
- *   ./validate_y_rotation images/base/base.jpg images/reference/reference_5deg.jpg
+ *   ./validate_y_rotation images/base/base.jpg images/reference/reference_18_5deg.jpg 18.5
  */
 
 #include <stdio.h>
@@ -33,22 +33,27 @@ int main(int argc, char *argv[]) {
     
     /* コマンドライン引数のチェック */
     if (argc < 3) {
-        fprintf(stderr, "使い方: %s <基準画像> <参照画像>\n", argv[0]);
+        fprintf(stderr, "使い方: %s <基準画像> <参照画像> [期待角度(度)]\n", argv[0]);
         fprintf(stderr, "\n");
         fprintf(stderr, "引数:\n");
         fprintf(stderr, "  基準画像: 注視点が中心にある画像（I_b）\n");
-        fprintf(stderr, "  参照画像: 5度回転させた画像（I_r）\n");
+        fprintf(stderr, "  参照画像: 任意角度で回転させた画像（I_r）\n");
         fprintf(stderr, "\n");
         fprintf(stderr, "例:\n");
-        fprintf(stderr, "  %s images/base/base.jpg images/reference/reference_5deg.jpg\n", argv[0]);
+        fprintf(stderr, "  %s images/base/base.jpg images/reference/reference_18_5deg.jpg 18.5\n", argv[0]);
         return 1;
     }
     
     const char *base_filename = argv[1];
     const char *ref_filename = argv[2];
+    double expected_angle_deg = 5.0;
+    if (argc >= 4) {
+        expected_angle_deg = atof(argv[3]);
+    }
     
     printf("基準画像: %s\n", base_filename);
     printf("参照画像: %s\n", ref_filename);
+    printf("期待角度: %.2f°\n", expected_angle_deg);
     printf("比較領域: (%d, %d) - (%d, %d)\n", 
            REGION_U_MIN, REGION_V_MIN, REGION_U_MAX, REGION_V_MAX);
     printf("角度範囲: %.1f° ~ %.1f° (刻み %.1f°)\n\n", 
@@ -157,6 +162,15 @@ int main(int argc, char *argv[]) {
     /* ファイルを閉じる */
     fclose(fp_obj);
     fclose(fp_der);
+
+    /* グラフ描画用に期待角度を保存 */
+    FILE *fp_expected = fopen("results/expected_angle.txt", "w");
+    if (fp_expected) {
+        fprintf(fp_expected, "%.6f\n", expected_angle_deg);
+        fclose(fp_expected);
+    } else {
+        fprintf(stderr, "警告: results/expected_angle.txt の保存に失敗\n");
+    }
     
     /* メモリ解放 */
     image_free(base);
@@ -168,7 +182,7 @@ int main(int argc, char *argv[]) {
     
     printf("\n===== 計算完了 =====\n");
     printf("次のステップ: Pythonでグラフを描画してください\n");
-    printf("  python3 validation/plot_results.py\n");
+    printf("  python3 validation/plot_results.py --expected-angle %.2f\n", expected_angle_deg);
     
     return 0;
 }
