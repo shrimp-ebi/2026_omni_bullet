@@ -24,8 +24,7 @@
 #define REGION_V_MAX 1614
 
 /* 角度範囲の設定 */
-#define ANGLE_MIN -5.0
-#define ANGLE_MAX 15.0
+#define ANGLE_HALF_RANGE 10.0
 #define ANGLE_STEP 0.1
 
 int main(int argc, char *argv[]) {
@@ -56,8 +55,11 @@ int main(int argc, char *argv[]) {
     printf("期待角度: %.2f°\n", expected_angle_deg);
     printf("比較領域: (%d, %d) - (%d, %d)\n", 
            REGION_U_MIN, REGION_V_MIN, REGION_U_MAX, REGION_V_MAX);
+    double angle_min = expected_angle_deg - ANGLE_HALF_RANGE;
+    double angle_max = expected_angle_deg + ANGLE_HALF_RANGE;
+
     printf("角度範囲: %.1f° ~ %.1f° (刻み %.1f°)\n\n", 
-           ANGLE_MIN, ANGLE_MAX, ANGLE_STEP);
+           angle_min, angle_max, ANGLE_STEP);
     
     /* 画像の読み込み */
     printf("【画像読み込み】\n");
@@ -116,15 +118,18 @@ int main(int argc, char *argv[]) {
     fprintf(fp_der, "angle_deg,analytical_derivative,numerical_derivative\n");
     
     /* 角度を変化させて計算 */
-    int total_points = (int)((ANGLE_MAX - ANGLE_MIN) / ANGLE_STEP) + 1;
+    int total_points = (int)((angle_max - angle_min) / ANGLE_STEP) + 1;
     int progress_step = total_points / 10;
+    if (progress_step <= 0) {
+        progress_step = 1;
+    }
     
     printf("  計算点数: %d点\n", total_points);
     printf("  処理中");
     fflush(stdout);
     
-    for (double psi = ANGLE_MIN; psi <= ANGLE_MAX; psi += ANGLE_STEP) {
-        int point_num = (int)((psi - ANGLE_MIN) / ANGLE_STEP);
+    for (double psi = angle_min; psi <= angle_max + 1e-9; psi += ANGLE_STEP) {
+        int point_num = (int)((psi - angle_min) / ANGLE_STEP);
         
         if (point_num % progress_step == 0) {
             printf(".");
