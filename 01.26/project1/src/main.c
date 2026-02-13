@@ -1,5 +1,10 @@
 /* main.c
  * 全方位画像からの注視画像生成
+*
+ * 理論側の前提：
+ *   X' = R X   （R : 世界座標 -> 回転後カメラ座標）
+ * 生成では逆変換：
+ *   X = R^T X' （出力側 X' から入力側 X を求める）
  * 
  * 使い方:
  *   ./main input.jpg output.jpg u_g v_g u_s v_s
@@ -44,8 +49,8 @@ Image* generate_gaze_image(Image *input, int u_g, int v_g, int u_s, int v_s) {
     Matrix3x3 R = compute_rotation_matrix(G, Gs);
     matrix_print("  回転行列R", R);
     
-    /* 回転行列の転置（逆回転用） */
-    Matrix3x3 R_T = matrix_transpose(R);  // ← コメントアウトを解除
+    /* 回転行列の転置（逆変換用） */
+    Matrix3x3 R_T = matrix_transpose(R); 
     
     /* 出力画像を作成 */
     printf("\n【ステップ4】注視画像の生成\n");
@@ -72,8 +77,13 @@ Image* generate_gaze_image(Image *input, int u_g, int v_g, int u_s, int v_s) {
             /* 1. 出力画素を世界座標に変換 */
             Vector3D X_prime = image_to_world(u_out, v_out, W, H);
 
-            /* 2. 回転: X = R^T × X' */
-            Vector3D X = matrix_vector_multiply(R_T, X_prime);  // ← R を R_T に変更
+            /* 2. 逆変換: X = R^T × X'
+             *   逆変換（理論）：世界方向 X を求めて入力画像をサンプルする
+             *  定義：X' = R X   （R: 世界 -> 回転後カメラ）
+             *  よって：X = R^T X'
+             * 「X′は回転後カメラ座標系」「Xは世界（=入力側の球面方向）」
+             */
+            Vector3D X = matrix_vector_multiply(R_T, X_prime); 
             
             /* 3. 世界座標を画像座標に変換 */
             double u_in, v_in;

@@ -112,7 +112,7 @@ Image *rotate_image_y_axis(Image *input, double psi_deg) {
   int H = input->height;
 
   /* 回転行列を計算 */
-  Matrix3x3 Rinv = create_y_rotation_matrix(-psi_deg);
+  Matrix3x3 Rinv = create_y_rotation_matrix(-psi_deg);   // 左に5度戻した位置
 
   /* 出力画像を作成 */
   Image *output = image_create_like(input);
