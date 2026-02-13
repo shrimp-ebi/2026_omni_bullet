@@ -4,12 +4,11 @@ LDFLAGS = -lm
 
 SRC_DIR = src
 BUILD_DIR = build
-TEST_DIR = test
 EXP_DIR = experiment
 
 COMMON_OBJS = $(BUILD_DIR)/coord_transform.o $(BUILD_DIR)/rotation.o $(BUILD_DIR)/vector_math.o $(BUILD_DIR)/image_utils.o $(BUILD_DIR)/y_rotation.o
 
-.PHONY: all clean test experiment validation help
+.PHONY: all clean experiment validation help
 
 all: $(BUILD_DIR)/main
 
@@ -41,17 +40,6 @@ experiment: $(BUILD_DIR)/experiment
 $(BUILD_DIR)/experiment: $(EXP_DIR)/experiment.c $(EXP_DIR)/objective.c $(EXP_DIR)/derivative.c $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-test: $(BUILD_DIR)/test_coord_transform $(BUILD_DIR)/test_rotation $(BUILD_DIR)/test_vector_math
-
-$(BUILD_DIR)/test_coord_transform: $(TEST_DIR)/test_coord_transform.c $(COMMON_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-$(BUILD_DIR)/test_rotation: $(TEST_DIR)/test_rotation.c $(COMMON_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-$(BUILD_DIR)/test_vector_math: $(TEST_DIR)/test_vector_math.c $(COMMON_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
 validation: validation/create_reference validation/validate_y_rotation
 
 validation/create_reference: validation/create_reference.c $(COMMON_OBJS)
@@ -65,7 +53,6 @@ clean:
 
 help:
 	@echo "make          - 注視画像生成プログラムをビルド"
-	@echo "make test     - テストプログラムをビルド"
 	@echo "make validation - 検証プログラムをビルド"
 	@echo "make experiment - 検証実験プログラムをビルド"
 	@echo "make clean    - クリーンアップ"
