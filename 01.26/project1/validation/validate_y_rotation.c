@@ -69,6 +69,30 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    /* 比較領域を切り出して保存 */
+    printf("\n【比較領域の保存】\n");
+    int region_width = REGION_U_MAX - REGION_U_MIN;
+    int region_height = REGION_V_MAX - REGION_V_MIN;
+    
+    Image *region = image_create(region_width, region_height, 3);
+    if (region) {
+        for (int v = 0; v < region_height; v++) {
+            for (int u = 0; u < region_width; u++) {
+                uint8_t rgb[3];
+                get_pixel(base, REGION_U_MIN + u, REGION_V_MIN + v, rgb);
+                set_pixel(region, u, v, rgb);
+            }
+        }
+        
+        if (image_save_jpg("results/region_base.jpg", region, 95)) {
+            printf("  比較領域を保存: results/region_base.jpg (%d × %d)\n", 
+                   region_width, region_height);
+        } else {
+            fprintf(stderr, "  警告: 比較領域の保存に失敗\n");
+        }
+        image_free(region);
+    }
+    
     /* 出力ファイルを開く */
     printf("\n【計算開始】\n");
     FILE *fp_obj = fopen("results/objective_function.csv", "w");

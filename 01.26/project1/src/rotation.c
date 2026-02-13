@@ -55,7 +55,9 @@ Vector3D compute_ex(Vector3D ey, Vector3D ez) {
 
 /* 注視点Gと補助点Gsから回転行列を計算
  * 
- * 式(7): R = [ex ey ez]
+ * 式(7): R = [ex ey ez]^T（転置版）
+ * 
+ * この定義により、逆変換は X = R^T X' で表現される
  */
 Matrix3x3 compute_rotation_matrix(Vector3D G, Vector3D Gs) {
     Matrix3x3 R;
@@ -79,19 +81,25 @@ Matrix3x3 compute_rotation_matrix(Vector3D G, Vector3D Gs) {
     Vector3D ex = compute_ex(ey, ez);
     vector_print("  ex (水平)", ex);
     
-    /* 4. 回転行列を構成: R = [ex ey ez] */
-    /* 各列ベクトルとして並べる */
-    R.m[0][0] = ex.x;  R.m[0][1] = ey.x;  R.m[0][2] = ez.x;
-    R.m[1][0] = ex.y;  R.m[1][1] = ey.y;  R.m[1][2] = ez.y;
-    R.m[2][0] = ex.z;  R.m[2][1] = ey.z;  R.m[2][2] = ez.z;
+    /* 4. 回転行列を構成: R = [ex ey ez]^T（転置版） */
+    /* 各行ベクトルとして並べる: R = [ex^T; ey^T; ez^T] */
+    R.m[0][0] = ex.x;  R.m[0][1] = ex.y;  R.m[0][2] = ex.z;
+    R.m[1][0] = ey.x;  R.m[1][1] = ey.y;  R.m[1][2] = ey.z;
+    R.m[2][0] = ez.x;  R.m[2][1] = ez.y;  R.m[2][2] = ez.z;
     
-    printf("\n各軸の確認:\n");
+    printf("\n各軸の確認（転置版: 各行がベクトル）:\n");
     printf("  ex = (%.6f, %.6f, %.6f)\n", ex.x, ex.y, ex.z);
     printf("  ey = (%.6f, %.6f, %.6f)\n", ey.x, ey.y, ey.z);
     printf("  ez = (%.6f, %.6f, %.6f)\n", ez.x, ez.y, ez.z);
-    printf("  R[0][2] = %.6f (ez.xと一致すべき)\n", R.m[0][2]);
-    printf("  R[1][2] = %.6f (ez.yと一致すべき)\n", R.m[1][2]);
-    printf("  R[2][2] = %.6f (ez.zと一致すべき)\n", R.m[2][2]);
+    
+    /* 各行ベクトルを取り出す（R = [ex; ey; ez]） */
+    Vector3D R_row0 = {R.m[0][0], R.m[0][1], R.m[0][2]};
+    Vector3D R_row1 = {R.m[1][0], R.m[1][1], R.m[1][2]};
+    Vector3D R_row2 = {R.m[2][0], R.m[2][1], R.m[2][2]};
+    
+    vector_print("  第1行（ex）", R_row0);
+    vector_print("  第2行（ey）", R_row1);
+    vector_print("  第3行（ez）", R_row2);
     
     return R;
 }
@@ -108,10 +116,10 @@ int rotation_matrix_verify(Matrix3x3 R) {
     
     printf("\n【回転行列の検証】\n");
     
-    /* 各列ベクトルを取り出す */
-    Vector3D ex = {R.m[0][0], R.m[1][0], R.m[2][0]};
-    Vector3D ey = {R.m[0][1], R.m[1][1], R.m[2][1]};
-    Vector3D ez = {R.m[0][2], R.m[1][2], R.m[2][2]};
+    /* 各行ベクトルを取り出す（R = [ex; ey; ez]） */
+    Vector3D ex = {R.m[0][0], R.m[0][1], R.m[0][2]};
+    Vector3D ey = {R.m[1][0], R.m[1][1], R.m[1][2]};
+    Vector3D ez = {R.m[2][0], R.m[2][1], R.m[2][2]};
     
     /* 1. 各軸が単位ベクトルか */
     double norm_ex = vector_norm(ex);
@@ -203,10 +211,10 @@ void rotation_matrix_info(Matrix3x3 R) {
     
     matrix_print("R", R);
     
-    /* 各列ベクトルを取り出す */
-    Vector3D ex = {R.m[0][0], R.m[1][0], R.m[2][0]};
-    Vector3D ey = {R.m[0][1], R.m[1][1], R.m[2][1]};
-    Vector3D ez = {R.m[0][2], R.m[1][2], R.m[2][2]};
+    /* 各行ベクトルを取り出す（R = [ex; ey; ez]） */
+    Vector3D ex = {R.m[0][0], R.m[0][1], R.m[0][2]};
+    Vector3D ey = {R.m[1][0], R.m[1][1], R.m[1][2]};
+    Vector3D ez = {R.m[2][0], R.m[2][1], R.m[2][2]};
     
     printf("\n各軸ベクトル:\n");
     vector_print("  ex (X軸/右方向)", ex);
