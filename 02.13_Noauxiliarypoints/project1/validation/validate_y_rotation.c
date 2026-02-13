@@ -14,6 +14,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include "../include/y_rotation.h"
 #include "../include/image_utils.h"
 
@@ -22,6 +24,60 @@
 #define REGION_V_MIN 1425
 #define REGION_U_MAX 3229
 #define REGION_V_MAX 1614
+
+
+static int infer_angle_from_filename(const char *path, double *angle_deg) {
+    const char *filename = strrchr(path, '/');
+    filename = filename ? filename + 1 : path;
+
+    const char *deg_pos = strstr(filename, "deg");
+    if (!deg_pos) {
+        return 0;
+    }
+
+    const char *start = deg_pos;
+    while (start > filename) {
+        char c = *(start - 1);
+        if (isdigit((unsigned char)c) || c == '_' || c == '.' || c == '-') {
+            start--;
+        } else {
+            break;
+        }
+    }
+
+    if (start == deg_pos) {
+        return 0;
+    }
+
+    size_t len = (size_t)(deg_pos - start);
+    if (len >= 63) {
+        len = 63;
+    }
+
+    char buf[64];
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+
+    for (size_t i = 0; i < len; i++) {
+        if (buf[i] == '_') {
+            buf[i] = '.';
+        }
+    }
+
+    char *num = buf;
+    while (*num != '\0' && !isdigit((unsigned char)*num) && *num != '-') {
+        num++;
+    }
+
+    char *endptr = NULL;
+    double v = strtod(num, &endptr);
+    if (endptr == num || *endptr != '\0') {
+        return 0;
+    }
+
+    *angle_deg = v;
+    return 1;
+}
 
 /* 角度範囲の設定 */
 #define ANGLE_HALF_RANGE 10.0
@@ -48,6 +104,14 @@ int main(int argc, char *argv[]) {
     double expected_angle_deg = 5.0;
     if (argc >= 4) {
         expected_angle_deg = atof(argv[3]);
+    } else {
+        double inferred_angle = 0.0;
+        if (infer_angle_from_filename(ref_filename, &inferred_angle)) {
+            expected_angle_deg = inferred_angle;
+            printf("期待角度が未指定のため、参照画像ファイル名から推定: %.2f°\n", expected_angle_deg);
+        } else {
+            printf("期待角度が未指定のため、デフォルト値 %.2f° を使用\n", expected_angle_deg);
+        }
     }
     
     printf("基準画像: %s\n", base_filename);
