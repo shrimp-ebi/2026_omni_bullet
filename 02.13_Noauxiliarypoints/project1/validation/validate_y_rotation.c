@@ -2,18 +2,20 @@
  * Y軸回りの1パラメータ検証実験
  * 
  * 目的:
- *   1. 目的関数E(ψ)が5度で最小値をとることを確認
+ *   1. 目的関数E(ψ)が期待角度で最小値をとることを確認
  *   2. 理論微分と数値微分が一致することを確認
  * 
  * 使い方:
- *   ./validate_y_rotation <基準画像> <参照画像>
+ *   ./validate_y_rotation <基準画像> <参照画像> [期待角度(度)]
  * 
  * 例:
- *   ./validate_y_rotation images/base/base.jpg images/reference/reference_5deg.jpg
+ *   ./validate_y_rotation images/base/base.jpg images/reference/reference_18_5deg.jpg 18.5
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include "../include/y_rotation.h"
 #include "../include/image_utils.h"
 
@@ -23,9 +25,62 @@
 #define REGION_U_MAX 3229
 #define REGION_V_MAX 1614
 
+
+static int infer_angle_from_filename(const char *path, double *angle_deg) {
+    const char *filename = strrchr(path, '/');
+    filename = filename ? filename + 1 : path;
+
+    const char *deg_pos = strstr(filename, "deg");
+    if (!deg_pos) {
+        return 0;
+    }
+
+    const char *start = deg_pos;
+    while (start > filename) {
+        char c = *(start - 1);
+        if (isdigit((unsigned char)c) || c == '_' || c == '.' || c == '-') {
+            start--;
+        } else {
+            break;
+        }
+    }
+
+    if (start == deg_pos) {
+        return 0;
+    }
+
+    size_t len = (size_t)(deg_pos - start);
+    if (len >= 63) {
+        len = 63;
+    }
+
+    char buf[64];
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+
+    for (size_t i = 0; i < len; i++) {
+        if (buf[i] == '_') {
+            buf[i] = '.';
+        }
+    }
+
+    char *num = buf;
+    while (*num != '\0' && !isdigit((unsigned char)*num) && *num != '-') {
+        num++;
+    }
+
+    char *endptr = NULL;
+    double v = strtod(num, &endptr);
+    if (endptr == num || *endptr != '\0') {
+        return 0;
+    }
+
+    *angle_deg = v;
+    return 1;
+}
+
 /* 角度範囲の設定 */
-#define ANGLE_MIN -5.0
-#define ANGLE_MAX 15.0
+#define ANGLE_HALF_RANGE 10.0
 #define ANGLE_STEP 0.1
 
 int main(int argc, char *argv[]) {
@@ -33,26 +88,42 @@ int main(int argc, char *argv[]) {
     
     /* コマンドライン引数のチェック */
     if (argc < 3) {
-        fprintf(stderr, "使い方: %s <基準画像> <参照画像>\n", argv[0]);
+        fprintf(stderr, "使い方: %s <基準画像> <参照画像> [期待角度(度)]\n", argv[0]);
         fprintf(stderr, "\n");
         fprintf(stderr, "引数:\n");
         fprintf(stderr, "  基準画像: 注視点が中心にある画像（I_b）\n");
-        fprintf(stderr, "  参照画像: 5度回転させた画像（I_r）\n");
+        fprintf(stderr, "  参照画像: 任意角度で回転させた画像（I_r）\n");
         fprintf(stderr, "\n");
         fprintf(stderr, "例:\n");
-        fprintf(stderr, "  %s images/base/base.jpg images/reference/reference_5deg.jpg\n", argv[0]);
+        fprintf(stderr, "  %s images/base/base.jpg images/reference/reference_18_5deg.jpg 18.5\n", argv[0]);
         return 1;
     }
     
     const char *base_filename = argv[1];
     const char *ref_filename = argv[2];
+    double expected_angle_deg = 5.0;
+    if (argc >= 4) {
+        expected_angle_deg = atof(argv[3]);
+    } else {
+        double inferred_angle = 0.0;
+        if (infer_angle_from_filename(ref_filename, &inferred_angle)) {
+            expected_angle_deg = inferred_angle;
+            printf("期待角度が未指定のため、参照画像ファイル名から推定: %.2f°\n", expected_angle_deg);
+        } else {
+            printf("期待角度が未指定のため、デフォルト値 %.2f° を使用\n", expected_angle_deg);
+        }
+    }
     
     printf("基準画像: %s\n", base_filename);
     printf("参照画像: %s\n", ref_filename);
+    printf("期待角度: %.2f°\n", expected_angle_deg);
     printf("比較領域: (%d, %d) - (%d, %d)\n", 
            REGION_U_MIN, REGION_V_MIN, REGION_U_MAX, REGION_V_MAX);
+    double angle_min = expected_angle_deg - ANGLE_HALF_RANGE;
+    double angle_max = expected_angle_deg + ANGLE_HALF_RANGE;
+
     printf("角度範囲: %.1f° ~ %.1f° (刻み %.1f°)\n\n", 
-           ANGLE_MIN, ANGLE_MAX, ANGLE_STEP);
+           angle_min, angle_max, ANGLE_STEP);
     
     /* 画像の読み込み */
     printf("【画像読み込み】\n");
@@ -111,15 +182,18 @@ int main(int argc, char *argv[]) {
     fprintf(fp_der, "angle_deg,analytical_derivative,numerical_derivative\n");
     
     /* 角度を変化させて計算 */
-    int total_points = (int)((ANGLE_MAX - ANGLE_MIN) / ANGLE_STEP) + 1;
+    int total_points = (int)((angle_max - angle_min) / ANGLE_STEP) + 1;
     int progress_step = total_points / 10;
+    if (progress_step <= 0) {
+        progress_step = 1;
+    }
     
     printf("  計算点数: %d点\n", total_points);
     printf("  処理中");
     fflush(stdout);
     
-    for (double psi = ANGLE_MIN; psi <= ANGLE_MAX; psi += ANGLE_STEP) {
-        int point_num = (int)((psi - ANGLE_MIN) / ANGLE_STEP);
+    for (double psi = angle_min; psi <= angle_max + 1e-9; psi += ANGLE_STEP) {
+        int point_num = (int)((psi - angle_min) / ANGLE_STEP);
         
         if (point_num % progress_step == 0) {
             printf(".");
@@ -157,6 +231,15 @@ int main(int argc, char *argv[]) {
     /* ファイルを閉じる */
     fclose(fp_obj);
     fclose(fp_der);
+
+    /* グラフ描画用に期待角度を保存 */
+    FILE *fp_expected = fopen("results/expected_angle.txt", "w");
+    if (fp_expected) {
+        fprintf(fp_expected, "%.6f\n", expected_angle_deg);
+        fclose(fp_expected);
+    } else {
+        fprintf(stderr, "警告: results/expected_angle.txt の保存に失敗\n");
+    }
     
     /* メモリ解放 */
     image_free(base);
@@ -168,7 +251,7 @@ int main(int argc, char *argv[]) {
     
     printf("\n===== 計算完了 =====\n");
     printf("次のステップ: Pythonでグラフを描画してください\n");
-    printf("  python3 validation/plot_results.py\n");
+    printf("  python3 validation/plot_results_2.py --expected-angle %.2f\n", expected_angle_deg);
     
     return 0;
 }

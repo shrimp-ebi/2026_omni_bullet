@@ -23,43 +23,41 @@ Vector3D compute_ez(Vector3D G) {
     return vector_normalize(G);
 }
 
-/* Y軸方向の計算（垂直方向）
+/* X軸方向の計算（水平方向）
  * 
- * 式(5): ey = N[G × Gs]
+ * 式: ex = N[up × ez]
  */
-Vector3D compute_ey(Vector3D G, Vector3D Gs) {
-    Vector3D cross = vector_cross(G, Gs);
-    
-    /* 外積がゼロベクトルかチェック（GとGsが平行） */
-    double norm = vector_norm(cross);
-    if (norm < 1e-10) {
-        fprintf(stderr, "エラー: 注視点Gと補助点Gsが平行です\n");
-        fprintf(stderr, "       別の補助点を選択してください\n");
-        Vector3D zero = {0.0, 0.0, 0.0};
-        return zero;
+Vector3D compute_ex(Vector3D ez) {
+    Vector3D up = vector_create(0.0, 1.0, 0.0);
+    Vector3D cross = vector_cross(up, ez);
+
+    /* 光軸がupと平行に近い場合は代替の基準ベクトルを使う */
+    if (vector_norm(cross) < 1e-10) {
+        Vector3D alt_up = vector_create(1.0, 0.0, 0.0);
+        cross = vector_cross(alt_up, ez);
     }
-    
+
     return vector_normalize(cross);
 }
 
-/* X軸方向の計算（水平方向）
+/* Y軸方向の計算（垂直方向）
  * 
- * 式(6): ex = ey × ez
+ * 式: ey = ez × ex
  */
-Vector3D compute_ex(Vector3D ey, Vector3D ez) {
-    Vector3D cross = vector_cross(ey, ez);
-    
+Vector3D compute_ey(Vector3D ez, Vector3D ex) {
+    Vector3D cross = vector_cross(ez, ex);
+
     /* 理論上は既に単位ベクトルだが、数値誤差対策で正規化 */
     return vector_normalize(cross);
 }
 
-/* 注視点Gと補助点Gsから回転行列を計算
+/* 注視点Gから回転行列を計算
  * 
  * 式(7): R = [ex ey ez]^T（転置版）
  * 
  * この定義により、逆変換は X = R^T X' で表現される
  */
-Matrix3x3 compute_rotation_matrix(Vector3D G, Vector3D Gs) {
+Matrix3x3 compute_rotation_matrix(Vector3D G) {
     Matrix3x3 R;
     
     /* 1. Z軸（光軸方向）を計算 */
@@ -67,20 +65,14 @@ Matrix3x3 compute_rotation_matrix(Vector3D G, Vector3D Gs) {
     printf("\n【デバッグ】回転行列計算\n");
     vector_print("  ez (光軸)", ez);
     
-    /* 2. Y軸（垂直方向）を計算 */
-    Vector3D ey = compute_ey(G, Gs);
-    vector_print("  ey (垂直)", ey);
-    
-    /* エラーチェック */
-    if (ey.x == 0.0 && ey.y == 0.0 && ey.z == 0.0) {
-        /* ゼロベクトルが返された場合は単位行列を返す */
-        return matrix_identity();
-    }
-    
-    /* 3. X軸（水平方向）を計算 */
-    Vector3D ex = compute_ex(ey, ez);
+    /* 2. X軸（水平方向）を計算 */
+    Vector3D ex = compute_ex(ez);
     vector_print("  ex (水平)", ex);
-    
+
+    /* 3. Y軸（垂直方向）を計算 */
+    Vector3D ey = compute_ey(ez, ex);
+    vector_print("  ey (垂直)", ey);
+
     /* 4. 回転行列を構成: R = [ex ey ez]^T（転置版） */
     /* 各行ベクトルとして並べる: R = [ex^T; ey^T; ez^T] */
     R.m[0][0] = ex.x;  R.m[0][1] = ex.y;  R.m[0][2] = ex.z;
