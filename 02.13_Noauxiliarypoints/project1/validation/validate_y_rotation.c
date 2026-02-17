@@ -251,7 +251,7 @@ int main(int argc, char *argv[]) {
     
     printf("\n===== 計算完了 =====\n");
     printf("次のステップ: Pythonでグラフを描画してください\n");
-    printf("  python3 validation/plot_results.py --expected-angle %.2f\n", expected_angle_deg);
+    printf("  python3 validation/plot_results_2.py --expected-angle %.2f\n", expected_angle_deg);
     
     return 0;
 }

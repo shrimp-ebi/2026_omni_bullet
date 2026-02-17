@@ -9,8 +9,6 @@ def run(image_path):
             points.append([x, y])
             print(f"点{len(points)}: ({x}, {y})")
             cv2.circle(img, (x, y), 10, (0, 0, 255), -1)
-            if len(points) == 2:
-                cv2.line(img, tuple(points[0]), tuple(points[1]), (0, 255, 0), 2)
 
     img = cv2.imread(image_path)
     if img is None:
@@ -24,10 +22,10 @@ def run(image_path):
     cv2.setMouseCallback("window", mouse_event)
 
     print("\n操作方法:")
-    print("  - 左クリック: 点を指定（1点目=注視点、2点目=補助点）")
+    print("  - 左クリック: 注視点を1点指定")
     print("  - 'z'キー: キャンセル")
     
-    while len(points) < 2:
+    while len(points) < 1:
         cv2.imshow("window", img)
         if cv2.waitKey(1) & 0xFF == ord("z"):
             break
@@ -93,21 +91,18 @@ if __name__ == "__main__":
     
     # 座標を取得
     print("\n" + "=" * 60)
-    print("画像上で2点をクリックしてください")
-    print("  1点目: 注視点（画像中心に配置したい点）")
-    print("  2点目: 補助点（画像の上下方向を決める点）")
+    print("画像上で注視点を1点クリックしてください")
+    print("  注視点: 画像中心に配置したい点")
     print("=" * 60)
     
     points = run(selected_image_path)
     
-    if len(points) == 2:
+    if len(points) == 1:
         u_g, v_g = points[0]
-        u_s, v_s = points[1]
         
         print("\n" + "=" * 60)
         print("取得した座標:")
         print(f"  注視点: ({u_g}, {v_g})")
-        print(f"  補助点: ({u_s}, {v_s})")
         print("=" * 60)
         
         # 相対パス
@@ -115,7 +110,7 @@ if __name__ == "__main__":
         output_rel = os.path.relpath(output_image_path, project_root)
         
         print("\n実行コマンド:")
-        print(f"./build/main {input_rel} {output_rel} {u_g} {v_g} {u_s} {v_s}")
+        print(f"./build/main {input_rel} {output_rel} {u_g} {v_g}")
         
         print(f"\n出力先: {output_rel}")
     else:
