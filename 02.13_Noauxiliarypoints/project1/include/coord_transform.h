@@ -77,12 +77,4 @@ Vector3D image_to_world(int u, int v, int W, int H);
  */
 void world_to_image(Vector3D xyz, int W, int H, double *u, double *v);
 
-
-/* ===========================
- * デバッグ・確認用
- * =========================== */
-
-/* 座標変換の動作確認 */
-void coord_transform_test(void);
-
 #endif /* COORD_TRANSFORM_H */
