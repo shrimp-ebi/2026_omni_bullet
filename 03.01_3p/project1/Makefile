@@ -37,29 +37,6 @@ $(BUILD_DIR)/y_rotation.o: $(SRC_DIR)/y_rotation.c
 
 experiment: $(BUILD_DIR)/experiment
 
-# 3パラメータ検証実験（LM法）
-experiment3: $(BUILD_DIR)/experiment_3param
-
-$(BUILD_DIR)/experiment_3param: $(EXP_DIR)/experiment_3param.c \
-                                 $(EXP_DIR)/objective_3param.c \
-                                 $(COMMON_OBJS_NO_LM)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-# omega2方向スキャン（Y軸版と同形式のグラフ出力用）
-scan: $(BUILD_DIR)/scan_omega2
-
-# lm_rotation.o を除いたオブジェクトファイル
-COMMON_OBJS_NO_LM = $(BUILD_DIR)/coord_transform.o $(BUILD_DIR)/rotation.o \
-                    $(BUILD_DIR)/vector_math.o $(BUILD_DIR)/image_utils.o \
-                    $(BUILD_DIR)/y_rotation.o
-
-$(BUILD_DIR)/scan_omega2: $(EXP_DIR)/scan_omega2.c \
-                           $(EXP_DIR)/objective_3param.c \
-                           $(COMMON_OBJS_NO_LM)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-
-
 $(BUILD_DIR)/experiment: $(EXP_DIR)/experiment.c $(EXP_DIR)/objective.c $(EXP_DIR)/derivative.c $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
