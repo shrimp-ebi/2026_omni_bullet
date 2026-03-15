@@ -9,6 +9,7 @@
 #define ROTATION_H
 
 #include "vector_math.h"
+#include "image_utils.h"
 
 /* ===========================
  * 回転行列の計算
@@ -54,6 +55,22 @@ Vector3D compute_ex(Vector3D ez);
  * 右手系座標系を構成
  */
 Vector3D compute_ey(Vector3D ez, Vector3D ex);
+
+/* ===========================
+ * 共通画像・角度微分ユーティリティ
+ * =========================== */
+
+/* グレースケール値をバイリニア補間で取得 */
+double image_gray_bilinear(Image *img, double u, double v);
+
+/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算（中央差分） */
+void image_derivative_theta_phi(Image *img, double u, double v,
+                                double *dS_dtheta, double *dS_dphi);
+
+/* ∂θ/∂X, ∂θ/∂Y, ∂θ/∂Z, ∂φ/∂X, ∂φ/∂Y, ∂φ/∂Z を計算 */
+void angle_jacobian_xyz(double theta, double phi,
+                        double *dth_dX, double *dth_dY, double *dth_dZ,
+                        double *dph_dX, double *dph_dY, double *dph_dZ);
 
 /* ===========================
  * 検証・デバッグ用

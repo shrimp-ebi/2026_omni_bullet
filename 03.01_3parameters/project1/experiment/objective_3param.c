@@ -6,6 +6,7 @@
 
 #include "objective_3param.h"
 #include "../include/coord_transform.h"
+#include "../include/rotation.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,82 +14,6 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-
-/* ===========================
- * 内部ヘルパー関数
- * =========================== */
-
-/* グレースケール値を取得（バイリニア補間あり） */
-static double gray_bilinear(Image *img, double u, double v) {
-    uint8_t rgb[3];
-    get_pixel_bilinear(img, u, v, rgb);
-    return (rgb[0] + rgb[1] + rgb[2]) / 3.0;
-}
-
-/* 参照画像の ∂S/∂θ, ∂S/∂φ を計算
- *
- * 池内論文 式(3.9) の説明部分：
- * 「画素値の差分として計算できる。ただし角度の変化量に基づいて計算する必要がある」
- *
- * θ方向：Δθ = 2π/W（1画素分の角度変化）
- * φ方向：Δφ = π/H  （1画素分の角度変化）
- *
- * ∂S/∂θ = (S(u+1,v) - S(u-1,v)) / (2 * Δθ)
- * ∂S/∂φ = (S(u,v+1) - S(u,v-1)) / (2 * (-1/Δφ))
- *            ↑ φ = -(v-H)*π/H なので dv/dφ = -H/π = -1/Δφ
- */
-static void image_derivative(Image *img, double u, double v,
-                              double *dS_dtheta, double *dS_dphi) {
-    int W = img->width;
-    int H = img->height;
-
-    double dtheta = 2.0 * M_PI / (double)W;  /* 1画素 = この角度 */
-    double dphi   = M_PI / (double)H;
-
-    /* θ方向（u方向、周期境界で自動処理される） */
-    double Sp = gray_bilinear(img, u + 1.0, v);
-    double Sm = gray_bilinear(img, u - 1.0, v);
-    *dS_dtheta = (Sp - Sm) / (2.0 * dtheta);
-
-    /* φ方向（v方向）*/
-    double Svp = gray_bilinear(img, u, v + 1.0);
-    double Svm = gray_bilinear(img, u, v - 1.0);
-    double dS_dv = (Svp - Svm) / 2.0;
-
-    /* 座標変換：φ = -(v-H)*π/H → dv/dφ = -H/π = -1/Δφ */
-    *dS_dphi = dS_dv * (-1.0 / dphi);
-}
-
-/* ∂θ/∂X', ∂θ/∂Y', ∂θ/∂Z', ∂φ/∂X', ∂φ/∂Y', ∂φ/∂Z' を計算
- *
- * 池内論文 式(3.13)（= omni_bullet.pdf 式16）:
- *   ∂θ/∂X = cos(θ)/sin(φ)
- *   ∂θ/∂Y = 0
- *   ∂θ/∂Z = -sin(θ)/sin(φ)
- *   ∂φ/∂X = cos(φ)sin(θ)
- *   ∂φ/∂Y = -sin(φ)
- *   ∂φ/∂Z = cos(φ)cos(θ)
- */
-static void angle_jacobian(double theta, double phi,
-                           double *dth_dX, double *dth_dY, double *dth_dZ,
-                           double *dph_dX, double *dph_dY, double *dph_dZ) {
-    double sinphi = sin(phi);
-    double cosphi = cos(phi);
-    double sinth  = sin(theta);
-    double costh  = cos(theta);
-
-    /* 極付近（sin(φ)≈0）で発散するので安全対策 */
-    if (fabs(sinphi) < 1e-8)
-        sinphi = (sinphi >= 0 ? 1e-8 : -1e-8);
-
-    *dth_dX = costh  / sinphi;
-    *dth_dY = 0.0;
-    *dth_dZ = -sinth / sinphi;
-
-    *dph_dX = cosphi * sinth;
-    *dph_dY = -sinphi;
-    *dph_dZ = cosphi * costh;
-}
 
 /* ∂X'/∂ωk を計算する（k=0,1,2 → ω₁,ω₂,ω₃）
  *
@@ -166,7 +91,7 @@ double compute_objective_3param(
             uint8_t rgb_b[3];
             get_pixel(base, u, v, rgb_b);
             double Sb = (rgb_b[0] + rgb_b[1] + rgb_b[2]) / 3.0;
-            double Sr = gray_bilinear(ref, u_ref, v_ref);
+            double Sr = image_gray_bilinear(ref, u_ref, v_ref);
 
             double diff = Sr - Sb;
             sum += diff * diff;
@@ -209,19 +134,19 @@ void compute_gradient_3param(
             uint8_t rgb_b[3];
             get_pixel(base, u, v, rgb_b);
             double Sb = (rgb_b[0] + rgb_b[1] + rgb_b[2]) / 3.0;
-            double Sr = gray_bilinear(ref, u_ref, v_ref);
+            double Sr = image_gray_bilinear(ref, u_ref, v_ref);
             double diff = Sr - Sb;
 
             /* ∂S/∂θ, ∂S/∂φ（参照画像の微分） */
             double dS_dtheta, dS_dphi;
-            image_derivative(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
+            image_derivative_theta_phi(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
 
             /* ∂θ/∂X', ∂φ/∂X' など（式3.13） */
             double theta_p, phi_p;
             world_to_angle(Xp, &theta_p, &phi_p);
             double dth_dX, dth_dY, dth_dZ;
             double dph_dX, dph_dY, dph_dZ;
-            angle_jacobian(theta_p, phi_p,
+            angle_jacobian_xyz(theta_p, phi_p,
                            &dth_dX, &dth_dY, &dth_dZ,
                            &dph_dX, &dph_dY, &dph_dZ);
 
@@ -281,14 +206,14 @@ void compute_hessian_3param(
 
             /* ∂S/∂θ, ∂S/∂φ */
             double dS_dtheta, dS_dphi;
-            image_derivative(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
+            image_derivative_theta_phi(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
 
             /* ∂θ/∂X', ∂φ/∂X' など */
             double theta_p, phi_p;
             world_to_angle(Xp, &theta_p, &phi_p);
             double dth_dX, dth_dY, dth_dZ;
             double dph_dX, dph_dY, dph_dZ;
-            angle_jacobian(theta_p, phi_p,
+            angle_jacobian_xyz(theta_p, phi_p,
                            &dth_dX, &dth_dY, &dth_dZ,
                            &dph_dX, &dph_dY, &dph_dZ);
 

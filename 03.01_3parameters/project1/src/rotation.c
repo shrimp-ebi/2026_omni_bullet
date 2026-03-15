@@ -4,6 +4,8 @@
 
 #include "rotation.h"
 #include "vector_math.h"
+#include "image_utils.h"
+#include "coord_transform.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -195,6 +197,83 @@ int rotation_matrix_verify(Matrix3x3 R) {
     }
     
     return ok;
+}
+
+/* ===========================
+ * 共通画像・角度微分ユーティリティ
+ * =========================== */
+
+/* グレースケール値をdouble精度でバイリニア補間して取得
+ * get_pixel_bilinear は uint8_t で返すため整数丸めが生じる。
+ * 微小座標変化（0.2px程度）を輝度値に反映するためdouble精度で直接計算する。
+ */
+double image_gray_bilinear(Image *img, double u, double v) {
+    int u0 = (int)floor(u);
+    int v0 = (int)floor(v);
+    int u1 = u0 + 1;
+    int v1 = v0 + 1;
+    double fu = u - u0;
+    double fv = v - v0;
+
+    uint8_t rgb00[3], rgb10[3], rgb01[3], rgb11[3];
+    get_pixel(img, u0, v0, rgb00);
+    get_pixel(img, u1, v0, rgb10);
+    get_pixel(img, u0, v1, rgb01);
+    get_pixel(img, u1, v1, rgb11);
+
+    double g00 = (rgb00[0] + rgb00[1] + rgb00[2]) / 3.0;
+    double g10 = (rgb10[0] + rgb10[1] + rgb10[2]) / 3.0;
+    double g01 = (rgb01[0] + rgb01[1] + rgb01[2]) / 3.0;
+    double g11 = (rgb11[0] + rgb11[1] + rgb11[2]) / 3.0;
+
+    return g00 * (1.0 - fu) * (1.0 - fv)
+         + g10 * fu         * (1.0 - fv)
+         + g01 * (1.0 - fu) * fv
+         + g11 * fu         * fv;
+}
+
+/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算（中央差分） */
+void image_derivative_theta_phi(Image *img, double u, double v,
+                                double *dS_dtheta, double *dS_dphi) {
+    int W = img->width;
+    int H = img->height;
+
+    const double dtheta = 2.0 * M_PI / (double)W;
+    const double dphi   = M_PI / (double)H;
+
+    /* θ方向（u方向差分） */
+    double S_u_plus  = image_gray_bilinear(img, u + 1.0, v);
+    double S_u_minus = image_gray_bilinear(img, u - 1.0, v);
+    *dS_dtheta = (S_u_plus - S_u_minus) / (2.0 * dtheta);
+
+    /* φ方向（v方向差分）
+     * phi = (H - v)*pi/H なので dv/dphi = -H/pi = -1/dphi */
+    double S_v_plus  = image_gray_bilinear(img, u, v + 1.0);
+    double S_v_minus = image_gray_bilinear(img, u, v - 1.0);
+    double dS_dv = (S_v_plus - S_v_minus) / 2.0;
+    *dS_dphi = dS_dv * (-1.0 / dphi);
+}
+
+/* ∂θ/∂X, ∂θ/∂Y, ∂θ/∂Z, ∂φ/∂X, ∂φ/∂Y, ∂φ/∂Z を計算 */
+void angle_jacobian_xyz(double theta, double phi,
+                        double *dth_dX, double *dth_dY, double *dth_dZ,
+                        double *dph_dX, double *dph_dY, double *dph_dZ) {
+    double sinphi = sin(phi);
+    double costh  = cos(theta);
+    double sinth  = sin(theta);
+    double cosphi = cos(phi);
+
+    /* 極（sinphi≈0）で発散するので安全対策 */
+    if (fabs(sinphi) < 1e-8)
+        sinphi = (sinphi >= 0 ? 1e-8 : -1e-8);
+
+    *dth_dX = costh  / sinphi;
+    *dth_dY = 0.0;
+    *dth_dZ = -sinth / sinphi;
+
+    *dph_dX = cosphi * sinth;
+    *dph_dY = -sinphi;
+    *dph_dZ = cosphi * costh;
 }
 
 /* 回転行列の詳細情報を表示 */
