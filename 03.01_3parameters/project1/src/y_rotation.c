@@ -3,6 +3,7 @@
  */
 
 #include "y_rotation.h"
+#include "rotation.h"
 #include "coord_transform.h"
 #include "vector_math.h"
 #include <math.h>
@@ -14,57 +15,6 @@
 
 /* 度数法からラジアンへの変換 */
 #define DEG_TO_RAD(deg) ((deg) * M_PI / 180.0)
-
-static inline double gray_at(Image *img, double u, double v) {
-  uint8_t rgb[3];
-  get_pixel_bilinear(img, u, v, rgb);
-  return (rgb[0] + rgb[1] + rgb[2]) / 3.0;
-}
-
-/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算（画像差分→角度差で割る） */
-static void ref_image_derivative_theta_phi(Image *ref, double u, double v,
-                                           double *dS_dtheta, double *dS_dphi) {
-  int W = ref->width;
-  int H = ref->height;
-
-  const double dtheta = 2.0 * M_PI / (double)W;
-  const double dphi = M_PI / (double)H;
-
-  /* θ方向（u方向差分、横は周期） */
-  double S_u_plus = gray_at(ref, u + 1.0, v);
-  double S_u_minus = gray_at(ref, u - 1.0, v);
-  *dS_dtheta = (S_u_plus - S_u_minus) / (2.0 * dtheta);
-
-  /* φ方向（v方向差分）
-     あなたのphi定義は phi = (H - v)*pi/H なので、dv/dphi = -H/pi = -1/dphi */
-  double S_v_plus = gray_at(ref, u, v + 1.0);
-  double S_v_minus = gray_at(ref, u, v - 1.0);
-  double dS_dv = (S_v_plus - S_v_minus) / 2.0;
-  *dS_dphi = dS_dv * (-1.0 / dphi);
-}
-
-/* ∂θ/∂X, ∂φ/∂X など（資料の式） */
-static void dtheta_dphi_dXYZ(double theta, double phi, double *dtheta_dX,
-                             double *dtheta_dY, double *dtheta_dZ,
-                             double *dphi_dX, double *dphi_dY,
-                             double *dphi_dZ) {
-  double sinphi = sin(phi);
-  double costh = cos(theta);
-  double sinth = sin(theta);
-  double cosphi = cos(phi);
-
-  /* 極（sinphi≈0）で発散するので安全対策 */
-  if (fabs(sinphi) < 1e-8)
-    sinphi = (sinphi >= 0 ? 1e-8 : -1e-8);
-
-  *dtheta_dX = costh / sinphi;
-  *dtheta_dY = 0.0;
-  *dtheta_dZ = -sinth / sinphi;
-
-  *dphi_dX = cosphi * sinth;
-  *dphi_dY = -sinphi;
-  *dphi_dZ = cosphi * costh;
-}
 
 /* ===========================
  * Y軸回りの回転行列
@@ -262,7 +212,7 @@ double compute_analytical_derivative(Image *base, Image *ref, double psi_deg,
 
       /* ===== 参照画像の微分：∂S/∂θ, ∂S/∂φ ===== */
       double dS_dtheta, dS_dphi;
-      ref_image_derivative_theta_phi(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
+      image_derivative_theta_phi(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
 
       /* ===== ∂θ/∂X', ∂φ/∂X' など ===== */
       double theta_p, phi_p;
@@ -270,8 +220,8 @@ double compute_analytical_derivative(Image *base, Image *ref, double psi_deg,
 
       double dth_dX, dth_dY, dth_dZ;
       double dph_dX, dph_dY, dph_dZ;
-      dtheta_dphi_dXYZ(theta_p, phi_p, &dth_dX, &dth_dY, &dth_dZ, &dph_dX,
-                       &dph_dY, &dph_dZ);
+      angle_jacobian_xyz(theta_p, phi_p, &dth_dX, &dth_dY, &dth_dZ, &dph_dX,
+                         &dph_dY, &dph_dZ);
 
       /* ===== 連鎖律で ∂S/∂X', ∂S/∂Y', ∂S/∂Z' ===== */
       double dSr_dX = dS_dtheta * dth_dX + dS_dphi * dph_dX;
@@ -293,8 +243,8 @@ double compute_analytical_derivative(Image *base, Image *ref, double psi_deg,
 double compute_numerical_derivative(Image *base, Image *ref, double psi_deg,
                                     double delta_psi, int u_min, int v_min,
                                     int u_max, int v_max) {
-  /* 数値微分: dE/dψ ≈ (E(ψ + Δψ) - E(ψ)) / Δψ
-   * 
+  /* 数値微分: dE/dψ ≈ (E(ψ + Δψ) - E(ψ - Δψ)) / (2 * Δψ)  [中央差分]
+   *
    * 注意: 理論微分との単位を合わせるため、ラジアンで微分する
    * delta_psi は度で与えられるが、微分値は [エネルギー/ラジアン] で返す
    */
@@ -302,12 +252,12 @@ double compute_numerical_derivative(Image *base, Image *ref, double psi_deg,
   /* delta_psiを度からラジアンに変換 */
   double delta_psi_rad = delta_psi * M_PI / 180.0;
 
-  double E_psi = compute_objective_function(base, ref, psi_deg, u_min, v_min,
-                                            u_max, v_max);
-
-  double E_psi_delta = compute_objective_function(
+  double E_plus = compute_objective_function(
       base, ref, psi_deg + delta_psi, u_min, v_min, u_max, v_max);
 
-  /* ラジアンで割る */
-  return (E_psi_delta - E_psi) / delta_psi_rad;
+  double E_minus = compute_objective_function(
+      base, ref, psi_deg - delta_psi, u_min, v_min, u_max, v_max);
+
+  /* ラジアンで割る（中央差分） */
+  return (E_plus - E_minus) / (2.0 * delta_psi_rad);
 }

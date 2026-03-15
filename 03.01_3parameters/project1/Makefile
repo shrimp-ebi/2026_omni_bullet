@@ -54,6 +54,38 @@ COMMON_OBJS_NO_LM = $(BUILD_DIR)/coord_transform.o $(BUILD_DIR)/rotation.o \
                     $(BUILD_DIR)/y_rotation.o
 
 $(BUILD_DIR)/scan_omega2: $(EXP_DIR)/scan_omega2.c \
+                          $(EXP_DIR)/objective_3param.c \
+                          $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# 3パラメータ スキャン（目的関数・微分のCSV出力）
+scan_3param: $(BUILD_DIR)/scan_3param
+
+$(BUILD_DIR)/scan_3param: $(EXP_DIR)/scan_3param.c \
+                           $(EXP_DIR)/objective_3param.c \
+                           $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# 勾配検証テスト（解析微分 vs 数値微分）
+test_gradient: $(BUILD_DIR)/test_gradient
+
+$(BUILD_DIR)/test_gradient: $(EXP_DIR)/test_gradient.c \
+                             $(EXP_DIR)/objective_3param.c \
+                             $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# 1画素デバッグ（勾配内部値の表示）
+debug_grad: $(BUILD_DIR)/debug_grad
+
+$(BUILD_DIR)/debug_grad: $(EXP_DIR)/debug_grad.c \
+                          $(EXP_DIR)/objective_3param.c \
+                          $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# LM法による3パラメータ回転推定
+lm_estimate: $(BUILD_DIR)/lm_estimate
+
+$(BUILD_DIR)/lm_estimate: $(EXP_DIR)/lm_estimate.c \
                            $(EXP_DIR)/objective_3param.c \
                            $(COMMON_OBJS_NO_LM)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
