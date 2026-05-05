@@ -13,6 +13,17 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+matplotlib.rcParams["font.family"] = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = [
+    "Noto Sans CJK JP",
+    "IPAexGothic",
+    "IPAGothic",
+    "TakaoGothic",
+    "VL Gothic",
+    "DejaVu Sans",
+]
+matplotlib.rcParams["axes.unicode_minus"] = False
+
 # ── paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
@@ -30,7 +41,6 @@ PARAM_LABELS = [r"$\omega_1$", r"$\omega_2$", r"$\omega_3$"]
 dfs = []
 for f in CSV_FILES:
     df = pd.read_csv(f)
-    df = df[(df["angle_deg"] >= -10) & (df["angle_deg"] <= 10)]
     # clip extreme analytical-gradient values (pole singularity near ±90°)
     clip = 1e5
     df["grad_analytical"] = df["grad_analytical"].clip(-clip, clip)
@@ -39,34 +49,38 @@ for f in CSV_FILES:
 
 # ── figure ────────────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(3, 2, figsize=(12, 12))
-fig.suptitle("3-Parameter Rotation Scan: Objective & Gradient", fontsize=14, y=1.01)
+fig.suptitle("3パラメータ回転スキャン: 目的関数と微分", fontsize=14, y=1.01)
 
 for row, (df, plabel) in enumerate(zip(dfs, PARAM_LABELS)):
     angle = df["angle_deg"].values
     E     = df["objective"].values
     ga    = df["grad_analytical"].values
     gn    = df["grad_numerical"].values
+    true_angle = df["true_angle_deg"].iloc[0]
 
     # ── left: objective function ───────────────────────────────────────────────
     ax_E = axes[row, 0]
     ax_E.plot(angle, E, color="navy", linewidth=1.5)
+    ax_E.axvline(true_angle, color="darkgreen", linewidth=1.0, linestyle=":",
+                 label=f"真値 {true_angle:.1f}°")
     ax_E.axhline(0, color="gray", linewidth=0.5, linestyle="--")
-    ax_E.axvline(0, color="gray", linewidth=0.5, linestyle="--")
-    ax_E.set_title(f"Objective E  ({plabel} only)", fontsize=11)
-    ax_E.set_xlabel("Rotation angle [deg]")
-    ax_E.set_ylabel("E")
+    ax_E.set_title(f"目的関数 E ({plabel} を走査)", fontsize=11)
+    ax_E.set_xlabel("回転角 [deg]")
+    ax_E.set_ylabel("目的関数 E")
+    ax_E.legend(fontsize=9)
     ax_E.grid(True, alpha=0.3)
 
     # ── right: gradient comparison ─────────────────────────────────────────────
     ax_G = axes[row, 1]
     ax_G.plot(angle, ga, color="red",  linewidth=1.5, linestyle="-",
-              label="Analytical")
+              label="解析微分")
     ax_G.plot(angle, gn, color="blue", linewidth=1.5, linestyle="--",
-              label="Numerical")
+              label="数値微分")
+    ax_G.axvline(true_angle, color="darkgreen", linewidth=1.0, linestyle=":",
+                 label=f"真値 {true_angle:.1f}°")
     ax_G.axhline(0, color="gray", linewidth=0.5, linestyle="--")
-    ax_G.axvline(0, color="gray", linewidth=0.5, linestyle="--")
-    ax_G.set_title(f"Gradient dE/d{plabel}  ({plabel} only)", fontsize=11)
-    ax_G.set_xlabel("Rotation angle [deg]")
+    ax_G.set_title(f"微分 dE/d{plabel} ({plabel} を走査)", fontsize=11)
+    ax_G.set_xlabel("回転角 [deg]")
     ax_G.set_ylabel(f"dE/d{plabel}")
     ax_G.legend(fontsize=9)
     ax_G.grid(True, alpha=0.3)

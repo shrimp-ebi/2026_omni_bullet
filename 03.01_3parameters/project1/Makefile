@@ -90,6 +90,38 @@ $(BUILD_DIR)/lm_estimate: $(EXP_DIR)/lm_estimate.c \
                            $(COMMON_OBJS_NO_LM)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+# LM法による3パラメータ回転推定（小領域版: 380×190 px）
+lm_estimate_small: $(BUILD_DIR)/lm_estimate_small
+
+$(BUILD_DIR)/lm_estimate_small: $(EXP_DIR)/lm_estimate_small.c \
+                                  $(EXP_DIR)/objective_3param.c \
+                                  $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# ω₁方向 収束域スキャン用バイナリ
+lm_scan_omega1: $(BUILD_DIR)/lm_scan_omega1
+
+$(BUILD_DIR)/lm_scan_omega1: $(EXP_DIR)/lm_scan_omega1.c \
+                               $(EXP_DIR)/objective_3param.c \
+                               $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# ω₁-ω₂ 2次元スキャン（目的関数曲面の可視化）
+scan_2d: $(BUILD_DIR)/scan_2d
+
+$(BUILD_DIR)/scan_2d: $(EXP_DIR)/scan_2d.c \
+                       $(EXP_DIR)/objective_3param.c \
+                       $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# 初期値別収束実験（3ケース）
+lm_convergence_cases: $(BUILD_DIR)/lm_convergence_cases
+
+$(BUILD_DIR)/lm_convergence_cases: $(EXP_DIR)/lm_convergence_cases.c \
+                                    $(EXP_DIR)/objective_3param.c \
+                                    $(COMMON_OBJS_NO_LM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 
 
 $(BUILD_DIR)/experiment: $(EXP_DIR)/experiment.c $(EXP_DIR)/objective.c $(EXP_DIR)/derivative.c $(COMMON_OBJS)
@@ -101,6 +133,14 @@ validation/create_reference: validation/create_reference.c $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 validation/validate_y_rotation: validation/validate_y_rotation.c $(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# 3パラメータ参照画像生成（ω₁, ω₂, ω₃ 指定）
+create_reference_3param: $(BUILD_DIR)/create_reference_3param
+
+$(BUILD_DIR)/create_reference_3param: validation/create_reference_3param.c \
+                                       $(EXP_DIR)/objective_3param.c \
+                                       $(COMMON_OBJS_NO_LM)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
