@@ -23,8 +23,8 @@
 
 int main(void)
 {
-    const char *base_path = "images/base/base.jpg";
-    const char *ref_path  = "images/reference/ref_w1_15_w2_30.jpg";
+    const char *base_path = "images/base/base3.jpg";
+    const char *ref_path  = "images/reference/ref_base3_w1_15_w2_30.jpg";
     const char *out_path  = "results/scan_2d.csv";
 
     /* 真値 */

@@ -72,7 +72,7 @@ initial_deg,converged,converged_true,final_omega1_deg,error_deg,frob_err,final_E
 17.0,True,True,14.999951,-4.900000000063187e-05,1.29e-06,3.2453237304,103
 17.1,True,True,14.999937,-6.30000000008124e-05,1.65e-06,3.2453223385,111
 17.2,True,True,14.999939,-6.100000000053285e-05,1.6e-06,3.245322421,119
-17.3,False,False,nan,nan,nan,nan,-1
+17.3,True,True,14.999937,-6.30000000008124e-05,1.65e-06,3.2453223542,127
 17.4,False,False,nan,nan,nan,nan,-1
 17.5,False,False,nan,nan,nan,nan,-1
 17.6,False,False,nan,nan,nan,nan,-1

@@ -8,7 +8,7 @@ EXP_DIR = experiment
 
 COMMON_OBJS = $(BUILD_DIR)/coord_transform.o $(BUILD_DIR)/rotation.o $(BUILD_DIR)/vector_math.o $(BUILD_DIR)/image_utils.o
 
-.PHONY: scan_3param scan_2d lm_estimate lm_convergence_cases lm_scan_omega1 create_reference_3param clean help
+.PHONY: scan_3param scan_2d lm_estimate lm_convergence_cases lm_scan_omega1 lm_scan_omega2 create_reference_3param clean help
 
 $(BUILD_DIR)/coord_transform.o: $(SRC_DIR)/coord_transform.c
 	@mkdir -p $(BUILD_DIR)
@@ -66,6 +66,14 @@ $(BUILD_DIR)/lm_scan_omega1: $(EXP_DIR)/lm_scan_omega1.c \
                                $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+# ω₂方向 収束域スキャン用バイナリ
+lm_scan_omega2: $(BUILD_DIR)/lm_scan_omega2
+
+$(BUILD_DIR)/lm_scan_omega2: $(EXP_DIR)/lm_scan_omega2.c \
+                               $(EXP_DIR)/objective_3param.c \
+                               $(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 # 3パラメータ参照画像生成（ω₁, ω₂, ω₃ 指定）
 create_reference_3param: $(BUILD_DIR)/create_reference_3param
 
@@ -86,3 +94,23 @@ help:
 	@echo "  make lm_scan_omega1        - ω₁方向 収束域スキャン"
 	@echo "  make create_reference_3param - 3パラメータ参照画像生成"
 	@echo "  make clean                 - クリーンアップ"
+
+
+lm_convergence_cases_base2: $(BUILD_DIR)/lm_convergence_cases_base2
+$(BUILD_DIR)/lm_convergence_cases_base2: $(EXP_DIR)/lm_convergence_cases_base2.c \
+										$(EXP_DIR)/objective_3param.c \
+										$(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+lm_convergence_cases_base3: $(BUILD_DIR)/lm_convergence_cases_base3
+$(BUILD_DIR)/lm_convergence_cases_base3: $(EXP_DIR)/lm_convergence_cases_base3.c \
+										$(EXP_DIR)/objective_3param.c \
+										$(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# 勾配の1次元断面スキャン
+scan_gradient_1d: $(BUILD_DIR)/scan_gradient_1d
+$(BUILD_DIR)/scan_gradient_1d: $(EXP_DIR)/scan_gradient_1d.c \
+								$(EXP_DIR)/objective_3param.c \
+								$(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

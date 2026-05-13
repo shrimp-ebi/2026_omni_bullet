@@ -28,18 +28,22 @@
 /* LM法パラメータ */
 #define C_INIT      0.0001
 #define EPS_OMEGA   1e-8
-#define MAX_ITER    150
+#define MAX_ITER    200
 #define C_MAX       1e10
 
-/* 参照画像（真値: ω₁=15°, ω₂=30°） */
-static const char *BASE_PATH = "images/base/base.jpg";
-static const char *REF_PATH  = "images/reference/ref_w1_15_w2_30.jpg";
+/* 参照画像（真値: Y軸-30°回転） */
+static const char *BASE_PATH = "images/base/base3.jpg";
+static const char *REF_PATH  = "images/reference/ref_base3_30deg.jpg";
 
-/* 理論値: rodrigues({-15°*pi/180, -30°*pi/180, 0}) = R(ω₁=15°, ω₂=30°) */
+/* 理論値: rodrigues({0, -30°*pi/180, 0}) = R_Y(-30°)
+ * reference_30deg.jpg に対応する正しい回転行列
+ *
+ * 検証: y_rotation.cではRinv=R_yrот(-30°)で逆写像するため、
+ * 目的関数で最小化すべきRはRinv^T = rodrigues({0,-30°,0}) となる */
 static const double RTH[3][3] = {
-    { 0.866792,  0.066604, -0.494201 },
-    { 0.066604,  0.966698,  0.247101 },
-    { 0.494201, -0.247101,  0.833490 }
+    { 0.866025,  0.000000, -0.500000 },
+    { 0.000000,  1.000000,  0.000000 },
+    { 0.500000,  0.000000,  0.866025 }
 };
 
 /* Frobenius ノルムで誤差を計算 */
@@ -106,8 +110,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* 初期回転行列: ω₁方向（X軸=垂直チルト）でスキャン。omega_internal = -omega_user */
-    double omega_init[3] = {-init_deg * M_PI / 180.0, -30.0 * M_PI / 180.0, 0.0};
+    /* 初期回転行列 */
+    double omega_init[3] = {0.0, -init_deg * M_PI / 180.0, 0.0};
     Matrix3x3 R = rodrigues(omega_init);
     double C = C_INIT;
 
