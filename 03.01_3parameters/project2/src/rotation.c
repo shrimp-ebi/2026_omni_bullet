@@ -237,20 +237,40 @@ void image_derivative_theta_phi(Image *img, double u, double v,
                                 double *dS_dtheta, double *dS_dphi) {
     int W = img->width;
     int H = img->height;
-
     const double dtheta = 2.0 * M_PI / (double)W;
     const double dphi   = M_PI / (double)H;
+    const double sigma  = 1.0;
+    const int    radius = 3;
 
-    /* θ方向（u方向差分） */
-    double S_u_plus  = image_gray_bilinear(img, u + 1.0, v);
-    double S_u_minus = image_gray_bilinear(img, u - 1.0, v);
-    *dS_dtheta = (S_u_plus - S_u_minus) / (2.0 * dtheta);
+    /* ガウシアン重みを計算（奇対称差分用） */
+    double weight[4]; /* weight[0]未使用, weight[1..3]が±1,±2,±3に対応 */
+    double wsum = 0.0;
+    for (int i = 1; i <= radius; i++) {
+        weight[i] = (double)i * exp(-(double)(i*i) / (2.0 * sigma * sigma));
+        wsum += 2.0 * weight[i];
+    }
+    /* 正規化 */
+    for (int i = 1; i <= radius; i++)
+        weight[i] /= wsum;
 
-    /* φ方向（v方向差分）
+    /* θ方向（u方向）の加重差分 */
+    double sum_theta = 0.0;
+    for (int i = 1; i <= radius; i++) {
+        double Sp = image_gray_bilinear(img, u + (double)i, v);
+        double Sm = image_gray_bilinear(img, u - (double)i, v);
+        sum_theta += weight[i] * (Sp - Sm);
+    }
+    *dS_dtheta = sum_theta / dtheta;
+
+    /* φ方向（v方向）の加重差分
      * phi = (H - v)*pi/H なので dv/dphi = -H/pi = -1/dphi */
-    double S_v_plus  = image_gray_bilinear(img, u, v + 1.0);
-    double S_v_minus = image_gray_bilinear(img, u, v - 1.0);
-    double dS_dv = (S_v_plus - S_v_minus) / 2.0;
+    double sum_phi = 0.0;
+    for (int i = 1; i <= radius; i++) {
+        double Sp = image_gray_bilinear(img, u, v + (double)i);
+        double Sm = image_gray_bilinear(img, u, v - (double)i);
+        sum_phi += weight[i] * (Sp - Sm);
+    }
+    double dS_dv = sum_phi;
     *dS_dphi = dS_dv * (-1.0 / dphi);
 }
 
