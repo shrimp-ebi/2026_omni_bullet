@@ -25,7 +25,7 @@ initial_deg,converged,converged_true,final_omega1_deg,error_deg,frob_err,final_E
 12.3,False,False,nan,nan,nan,nan,-1
 12.4,False,False,nan,nan,nan,nan,-1
 12.5,False,False,nan,nan,nan,nan,-1
-12.6,False,False,nan,nan,nan,nan,-1
+12.6,True,True,14.999943,-5.699999999997374e-05,1.55e-06,3.245323139,133
 12.7,True,True,14.999945,-5.499999999969418e-05,1.49e-06,3.2453231802,123
 12.8,True,True,14.999932,-6.800000000062312e-05,1.82e-06,3.2453226199,119
 12.9,True,True,14.999956,-4.400000000082116e-05,1.16e-06,3.2453249309,111
