@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsrc_lib.a CMakeFiles/src_lib.dir/Estimator.cpp.o
+/usr/bin/ranlib libsrc_lib.a

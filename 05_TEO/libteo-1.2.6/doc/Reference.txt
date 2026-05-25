@@ -1,0 +1,1033 @@
++--------------------------------------------------------------------+
+|   Reference Manual of TEO library Ver 1.1.4           Y.Mukaigaw   |
+|                                                        1998.7.31   |
++--------------------------------------------------------------------+
+
+######################################################################
+目次
+	０ はじめに
+	１ TEO画像フォーマットの特徴
+		1.1 シンプルな構造
+		1.2 さまざまな画素値の型
+		1.3 座標系
+		1.4 マルチプレーン・マルチフレーム
+		1.5 圧縮
+		1.6 User Extension(ユーザ拡張)
+	２ ライブラリの概要
+		2.1 画素値の型
+		2.2 ファイル・画像を表現する構造体
+		2.3 エラー処理
+		2.4 環境変数
+		2.5 コンパイル方法
+	３ 一般向け関数群
+		3.1 ファイルアクセス
+		3.1.1 ファイルオープン・クローズ
+		3.1.2 新規にファイルを作成
+		3.2 画像アクセス
+		3.3 画素アクセス
+		3.4 構造体にアクセスするマクロ
+		3.4.1 TEOFILEと TEOIMAGEに共通して使えるマクロ
+		3.4.2 TEOFILEにのみ使えるマクロ
+		3.4.3 TEOIMAGEにのみ使えるマクロ
+		3.5 その他
+	４ 特殊用途向け関数群
+		4.1 新規にファイルを作成
+		4.1.1 User Extensionを指定しないファイル作成
+		4.1.2 User Extensionを指定するファイル作成
+		4.2 User Extensiobn(ユーザ拡張領域)へのアクセス
+		4.3 内部で使用する関数群
+	５ デバッグモード
+	６ サンプルプログラム
+	７ 関数リファレンス
+	８ 最後に
+	
+######################################################################
+０ はじめに
+
+このドキュメントは，TEO(Tsukuba-Etl-Okayama)画像フォーマット Ver１をＣ
+言語で簡単に扱うためのライブラリ libteoについてのリファレンスマニュア
+ルです．TEOを扱う際には，必ずしもこのライブラリを使う必要はありません
+が，このライブラリはアーキテクチャの違いを吸収してくれます．このライブ
+ラリを使って書かれたプログラムは，プラットホームに依存しないものとなり
+ますので，ぜひ活用して下さ
+
+これはリファレンスマニュアルですので，必要な情報をすべて網羅するという
+方針で書かれています．とりあえず簡単なプログラミングを始めてみようとい
+う人は，
+	３章 一般向け関数群
+	６章 サンプルプログラム
+を読むといいでしょう．
+
+
+######################################################################
+１ TEO画像フォーマットの特徴
+
+=============================================
+1.1 シンプルな構造
+=============================================
+
+TEO画像フォーマットは，
+ １ 画像の情報を表すヘッダー部
+ ２ 画像自体のバイナリデータ部
+ ３ ユーザが自由に使えるフッター部
+
+からなります．ヘッダー部はテキストで書かれています．バイナリデータ部に
+は，画像のデータが（いわゆる）ベタ形式として格納されています．
+
+このように TEO画像は非常にシンプルな構造ですが，
+ ○ プラットホームに依存しない
+ ○ 多様な形式で画像を扱える
+ ○ ユーザによる拡張性がある
+という特徴があります．
+
+TEO画像フォーマットの詳細については，フォーマット仕様書で詳しく述べら
+れていますので，そちらを参考にして下さい．
+
+=============================================
+1.2 さまざまな画素値の型
+=============================================
+
+TEOには，さまざまな画素値の型が用意されています．
+	２値		1bit (0 or 1)
+	整数		8bit/16bit/32bit/64bitのそれぞれについて
+			signed / unsignedが用意されています
+	浮動小数点	単精度(32bit) / 倍精度(64bit)
+
+  ※ ２値画像では，０が黒，１が白となることを推奨します
+
+=============================================
+1.3 座標系
+=============================================
+
+TEOでは画素の位置を，横方向に右を正とするＸ座標，縦方向に下を正とする
+Ｙ座標で表現します．ただし，原点の位置は任意に指定できますので，左上の
+隅が必ずしも (0,0)にならず，座標値が負の値になることもありますので，プ
+ログラミングの際には注意が必要です．TEOでは，左上の隅の座標のことを
+「座標値のオフセット」と呼びます．
+
+座標値の範囲については，さまざまなマクロが用意されています．
+
+=============================================
+1.4 マルチプレーン・マルチフレーム
+=============================================
+
+TEOフォーマットでは，画像をマルチプレーン・マルチフレームとして扱いま
+す．シングルプレーンとは，画素値が一つの値を持つ画像で，グレイ画像がこ
+れにあたります．マルチプレーンとは，複数のプレーンをまとめて1枚の画像
+と扱う機能です．カラー画像だと普通はRGBの３プレーンですが，YUVの３プレー
+ンとして使うこともできますし，ステレオ画像を２プレーンで表現したり，
+RGB値にα値を加えて４プレーンとすることも自由にできます．TEOは，このよ
+うに多数のプレーンを１枚の画像として扱います．
+
+ ※カラー画像の場合は３プレーンとし，RGBの順に格納することを推奨します
+
+TEOのマルチフレームとは，複数の画像をまとめて一つのファイルにできる機
+能です．マルチフレーム機能を利用することにより，時系列の動画を一つのファ
+イルに格納することができます．TEOは基本的に動画を基本としています．つ
+まり，静止画はフレーム数が１の動画であると解釈します．
+
+=============================================
+1.5 圧縮
+=============================================
+
+画像ファイルはサイズが大きくなりますが，TEOは画像を圧縮する機能があり
+ます．このライブラリを使う限り，ユーザは画像が圧縮されているかどうかを
+全く気にする必要はありません．ライブラリが自動的に圧縮／伸長してくれま
+す．
+
+なお，画像を圧縮するツールとして teogzipが，伸長するツールとして 
+teoungzipがコマンドとして用意されています．
+
+=============================================
+1.6 User Extension(ユーザ拡張)
+=============================================
+
+TEO画像フォーマットは，ユーザが自由に拡張できるように設計されています．
+拡張する方法は２通りあります．
+ １ ヘッダー部に「#%」で始まる行に記述
+ ２ フッター部を利用
+この機能を利用すれば，フレーム数のオフセットを記述したり，サイズの異な
+る画像を一つのファイルにまとめたりすることもできます．
+
+ヘッダー部の User Extensionの解析を助ける関数は，ライブラリとして用意
+されています．
+
+
+######################################################################
+２ ライブラリの概要
+
+=============================================
+2.1 画素値の型
+=============================================
+
+ライブラリでは，画素値を表す型として以下のものが定義されています．プラッ
+トホームに依存しないプログラムを書くためには，画素値はかならず，これら
+の型を用いて下さい．便宜上，これらの型のことを「ETYPE」と呼びます．
+
+	TEO_BIT		２値
+	TEO_UINT8	符号なし8bit
+	TEO_SINT8	符号あり8bit
+	TEO_UINT16	符号なし16bit
+	TEO_SINT16	符号あり16bit
+	TEO_UINT32	符号なし32bit
+	TEO_SINT32	符号あり32bit
+	TEO_FLOAT32	浮動小数点32bit
+	TEO_FLOAT64	浮動小数点64bit
+
+※ 64bit以上の整数は，現段階ではライブラリではサポートしません．
+
+画素値の符号を表す型として，以下のものを定義します．次節で説明する構造
+体の中で画像の型を示すメンバ typeの値として利用して下さい．
+
+	TEO_SIGNED      符号つき整数
+	TEO_UNSIGNED    符号なし整数
+	TEO_FLOAT       浮動小数点
+
+=============================================
+2.2 ファイル・画像を表現する構造体
+=============================================
+
+TEOでは画像ファイル・画像データを扱うために，それぞれ TEOFILE型・
+TEOIMAGE型を定義しています．
+
+TEOFILE型は，動画ファイルを表します．"foo.teo"へのファイルポインタのよ
+うなものと考えて下さい．加えて，サイズやフレーム数などの動画ファイルと
+しての情報を持っています．ただし，画像データそのものは含みません．
+
+typedef struct{
+  int width;		/* 横サイズ */
+  int height;		/* 縦サイズ */
+  int xoffset;		/* x 座標のオフセット値 */
+  int yoffset;		/* y 座標のオフセット値 */
+  int type;		/* 画素の型 */
+  int bit;		/* 画素の bit 数 */
+  int plane;		/* プレーン数 */
+  int frame;		/* フレーム数 */
+  int current;          /* 次にアクセスしようとしているフレーム番号 */
+  int extc;		/* ユーザ拡張用カウンタ */
+  char **extv;		/* ユーザ拡張用文字列へのポインタ */
+  int fsize;		/* 1フレームのサイズ */
+  int hsize;		/* データ部の先頭のポイント */
+  FILE *fp;		/* ファイルへのポインタ */
+  int ac_type;		/* アクセスモード */
+  char *filename	/* ファイル名 */
+  char *tmpfile;	/* テンポラリファイル名 */
+} TEOFILE;
+
+
+TEOIMAGE型は，シングルフレームの画像を表します．静止画のサイズなどの情
+報とともに画像データそのものを含みます．なお，TEOIMAGE型は，ユーザで
+メモリの確保・解放の管理が必要です．
+
+typedef struct{
+  int width;		/* 横サイズ */
+  int height;		/* 縦サイズ */
+  int xoffset;		/* x 座標のオフセット値 */
+  int yoffset;		/* y 座標のオフセット値 */
+  int type;		/* 画素の型 */
+  int bit;		/* 画素の bit 数 */
+  int plane;		/* プレーン数 */
+  char *data;		/* 画像データ */
+  int fsize;		/* 1フレームのサイズ */
+} TEOIMAGE;
+
+※ ライブラリのバージョンアップに伴い，構造体のメンバは変更される可能
+   性があります．
+
+=============================================
+2.3 エラー処理
+=============================================
+
+TEOライブラリの関数群のいくつかは，内部でエラーが起きた時，NULLを返し
+ます．エラーの種類は大域変数 TEO_ERROR_CODEに入ります．
+
+適切なエラーメッセージを出力するためには，後述する関数 TeoError()を利
+用して下さい．
+
+=============================================
+2.4 環境変数
+=============================================
+
+TEO画像は，圧縮した状態で利用できます．本ライブラリのいくつかは，生成
+ファイルの圧縮形式を決めるために，環境変数TEO_GZIP を利用します．この
+変数が `yes'になっていれば，生成される画像ファイルは自動的に圧縮された
+ものとなります．画像ファイルはサイズが大きくなりがちですので，特に理由
+のない限り設定しておくことをお勧めします．
+
+例) setenv TEO_GZIP yes
+
+また，環境変数 TEO_GZIP_COMMAND, TEO_GUNZIP_COMMAND で圧縮・伸長を行う
+コマンドを変更することもできます．ただしどちらも結果を標準出力に出力す
+る形式で指定して下さい．一時的に別のバージョンの gzipを使いたい時など
+に利用して下さい．特に指定しない場合，ライブラリのコンパイル時に指定さ
+れたコマンドがデフォルトとして使われます．
+
+例) setenv TEO_GZIP_COMMAND "/usr/local/bin/gzip -c"
+    setenv TEO_GUNZIP_COMMAND "/usr/local/bin/zcat"
+
+また，環境変数 TEO_TMP_DIR を指定することによって圧縮・伸長のための作
+業ディレクトリを変更することができます．大きな圧縮ファイルを開きたいが，
+作業ディレクトリに余裕がない場合などに利用して下さい．特に指定しない場
+合，ライブラリのコンパイル時に指定されたディレクトリがデフォルトとして
+使われます(配布パッケージでは /tmpになっています)．
+
+例) setenv TEO_TMP_DIR "/home/hogehoge/tmp"
+
+=============================================
+2.5 コンパイル方法
+=============================================
+
+ライブラリは，ヘッダーファイル teo.hと，ライブラリ libteoからなります．
+プログラム中では，ヘッダーファイルを次のようにして読み込んで下さい．
+ #include <teo.h>
+
+コンパイルには，
+ -I<ヘッダーファイルのありか> -L<ライブラリのありか> -lteo
+というオプションが必要です．
+
+例) 岡山大学尺長研の場合
+    gcc -I/usr/local/lab/include -L/usr/local/lab/lib ソース.c -lteo 
+
+例) 筑波大学画像研の場合
+    gcc -I/usr/local/Image/include -L/usr/local/Image/lib ソース.c -lteo
+
+
+プログラム作成時のバグをなくすためには，デバッグモードを利用した方がい
+いでしょう．上記のオプションの他に，
+ -DTEO_DEBUG_ALL
+を付けておくことをお勧めします(Makefile中では CFLAGSに追加します)．
+詳しくは「デバッグモード」の章を参考にして下さい．
+Makefileの書き方については，サンプルプログラムの章を参考にして下さい．
+
+######################################################################
+３ 一般向け関数群
+
+本節では，一般の人が用いる中レベルの関数群について説明します．ここで述
+べる関数やマクロは，高度な機能を簡単に扱うことができます．基本的には本
+節で述べられている関数群だけで画像処理のプログラムを作成することができ
+ますので，一般ユーザ，特に初めてlibteoを利用する人は，これらを利用して
+下さい．なお，特殊な用途向けの低レベル関数群については次節で述べます．
+
+=============================================
+3.1 ファイルアクセス
+=============================================
+
+-----------------------------------
+3.1.1 ファイルオープン・クローズ
+-----------------------------------
+---
+TEOFILE *TeoOpenFile(char *filename);
+
+引数で与えられたファイル名の動画ファイルをオープンします．具体的には，
+ファイルをオープンし，動画ファイルのヘッダー情報を読みとり，内部で確保
+したTEOFILE型にヘッダー情報を書き込み，そのポインタを返します．動画ファ
+イルに関する情報は返されるTEOFILE型に含まれていますので，以後はTEOFILE
+型を通して動画ファイルにアクセスします．なお，オープン直後は，ファイル
+ポインタはデーター部の先頭にあります．
+
+これらの関数には，以下の機能があります．
+
+ ○ファイル名が "-" の場合には，標準入力から読み込みます．
+ ○ファイルが PNMフォーマットの場合には，自動的にPNMとしてヘッダーを解
+   析し，以後は TEOファイルと同様に扱うことができます．
+ ○ファイルが圧縮されているかどうかを自動的に判別し，圧縮されている場
+   合には伸長して通常のTEOファイルとして扱うことができます．
+
+例）file=TeoOpenFile("-")       標準入力から読み込みます．
+    file=TeoOpenFile("foo.teo") TEOファイルとして読み込みます．圧縮され
+                                ていれば自動的に伸長し，以後は通常のTEO
+                                ファイルとして読み込みます．
+    file=TeoOpenFile("foo.ppm") PNMとしてヘッダを解析し，以後はTEOファ
+                                イルとして読み込みます．圧縮されていれ
+                                ば自動的に伸長し，PNMとしてヘッダを解析
+                                し，以後は TEOファイルとして読み込みます．
+
+注）圧縮されたファイルをオープンする場合には，十分な大きさ(伸長された
+    ファイルが収まる大きさ)の作業ディレクトリがあることを確認して下さ
+    い．なお，作業ディレクトリの場所は環境変数で変更可能です．
+
+---
+TEOFILE *TeoCloseFile(TEOFILE *teofp);
+
+引数で与えられた TEOFILEをクローズします．新たに生成したファイルの場合，
+必要であればファイルが自動的に圧縮されます．既存のファイルの場合には，
+作業用ファイル(伸長されたファイル内容)が消去されます．さらに，TEOFILE
+の構造体自身のメモリも解放されます．ここで，TEOIMAGE自体は全く影響を受
+けないことに注意して下さい．
+
+-----------------------------------
+3.1.2 新規にファイルを作成
+-----------------------------------
+---
+TEOFILE *TeoCreateFile(char *filename,
+		   int width,int height,int xoffset,int yoffset,
+		   int type,int bit,
+		   int plane,int frame);
+TEOFILE *TeoCreateSimilarFile(char *filename,TEOFILE *teofp);
+
+TeoCreateFileは作成したい動画像の名前・サイズ・型などを指定して，ファ
+イルを新たに生成します．TeoCreateSimilarFileは，既に存在する動画ファイ
+ルと同じサイズ・型の動画ファイルを新たに生成します．
+
+例) teofile = TeoCreateFile("foo.teo",640,480,0,0,TEO_UNSIGNED,8,3,1);
+	"foo.teo"という名前で，横640縦480，左上の座標が(0,0)，符号なし
+	8bit，３プレーン，１フレームの画像ファイルを生成します．
+
+
+これらの関数には，以下の機能があります．
+
+ ○ファイル名が "-" の場合には，標準出力に書き出します．
+ ○環境変数 TEO_GZIPを参照し，値が`yes'になっていれば，自動的に圧縮ファ
+   イルを生成します．
+
+注）圧縮ファイルを生成する場合には，十分な大きさ(圧縮前のファイルが収
+    まる大きさ)の作業ディレクトリがあることを確認して下さい．なお，作
+    業ディレクトリの場所は環境変数で変更可能です．
+
+
+=============================================
+3.2 画像アクセス
+=============================================
+
+---
+TEOIMAGE *TeoAllocSimilarImage(TEOFILE *teofp);
+TEOIMAGE *TeoAllocSimilarImage(TEOIMAGE *image);
+
+画像の情報を格納するのに必要なメモリを確保します．具体的には，引数で与
+えられた動画ファイルや画像と同じサイズや型の画像を表す TEOIMAGE構造体
+を作成し，必要な情報を書き込みます．また，画像データを格納するメモリを 
+mallocし，そのポインタを構造体のメンバとして保持し，構造体のポインタを
+返します．
+
+これらの２種類の呼び出しは，引数の型は異なりますが，マクロで組まれてい
+るため，同じ名前になっています．マクロであるため，引数は複数回参照され
+るため，TeoAllocSimilarImage(image++)のような書き方は正しく動作しませ
+んので注意が必要です．
+
+---
+TEOIMAGE *TeoAllocImage(int width,int height,int xoffset,int yoffset,
+			int type,int bit,int plane);
+
+画像の情報を格納するのに必要なメモリを確保します．具体的な動作は前述の
+TeoAllocSimilarImageと同じですが，画像のサイズ・型などは，すべて引数で
+指定します．一時的に利用する画像を生成する際に用いられます．
+
+---
+int TeoFreeImage(TEOIMAGE *image);
+
+画像データを解放します．具体的には，画像データを格納している領域をfree
+し，TEOIMAGE構造体自体を破棄します．なお，上記の３種類のTeoAllocImage
+シリーズのうち，どの関数で確保したものでも，このTeoFreeImageで解放でき
+ます．
+
+---
+int TeoReadFrame(TEOFILE *teofp,TEOIMAGE *image);
+
+現在のファイルポインタの位置から，１フレーム分のデータを読み込み，指定
+された画像にコピーします．ファイルポインタは次のフレームの先頭に移動し
+ます．動画像データを次々と連続的に読み込む場合には，ファイルポインタを
+操作する必要はなく，TeoReadFrameを次々と呼ぶだけです．
+
+---
+int TeoWriteFrame(TEOFILE *teofp,TEOIMAGE *image);
+
+現在のファイルポインタの位置に，指定されたメモリ領域にある１フレーム分
+の画像データを書き出します．動画像データを次々と連続的に書き込む場合に
+は，ファイルポインタを操作する必要はなく，TeoWriteFrameを次々と呼ぶだ
+けです．
+
+---
+int TeoSetAbsFrame(TEOFILE *teofp, int frame);
+
+frameで指定したフレーム番号の画像の先頭に，ファイルポインタを絶対的に
+移動します．0を指定した場合は最初のフレームの先頭アドレスにファイルポ
+インタを移動します．
+
+---
+int TeoSetRelFrame(TEOFILE *teofp, int frame);
+
+frameで指定したフレーム数だけ，ファイルポインタを相対的に移動します．0
+を指定した場合は移動しません．
+
+---
+int TeoCheckFrame(TEOFILE *teofp)
+
+次にアクセスしようとしているフレームがフレーム数の範囲内ならば真(非0値)，
+そうでなければ偽(0)を返します．
+
+
+=============================================
+3.3 画素アクセス
+=============================================
+
+---
+ETYPE TeoGetPixel(TEOIMAGE *image,int index_x,int index_y,int index_p,
+		       ETYPE);
+ETYPE TeoPutPixel(TEOIMAGE *image,int index_x,int index_y,int index_p,
+		       ETYPE,ETYPE val);
+
+(x,y)座標，p番目のプレーンの画素にアクセスします．座標は左上が必ずしも
+(0,0)とはならないので注意して下さい．また，プレーン番号は 0から数えて
+下さい．ETYPEはアクセスする画素の型です(2.1節参照)．TeoGetPixelは指定
+された座標の画素値を返します．TeoPutPixelはvalの値を指定された座標にセッ
+トします．２値画像を除く全ての型のフォーマットについてアクセスできます
+が，２値画像については TeoGetBit/TeoPutBit を利用して下さい．
+
+例) TeoPutPixel(image, 10,20, 0, TEO_UINT8, 100);
+    画像 imageの 0番目のプレーンの(10,20)の座標に，符号なし8bit整数100
+    を書き込みます．
+
+---
+TEO_BIT TeoGetBit(TEOIMAGE *image,int index_x,int index_y,int index_p);
+TEO_BIT TeoPutBit(TEOIMAGE *image,int index_x,int index_y,int index_p,
+		       TEO_BIT val);
+
+２値画像の(x,y)座標，p番目のプレーンの画素にアクセスします．TeoGetBit
+は指定された座標の画素値をTEO_BIT型の0か1で返します．TeoPutBitは指定さ
+れた座標の画素値をvalの値(0か1)にセットします．
+
+例) TeoPutBit(image,10,20, 0, 1);
+    ２値画像 imageの 0番目のプレーンの(10,20)の座標に １を書き込みます．
+
+=============================================
+3.4 様々なマクロ
+=============================================
+
+ここでは，動画フォーマットや画像から様々な情報を抽出するためのマクロに
+ついて説明します．これらのマクロはを利用しなくても，構造体のメンバを直
+接参照することも可能です．ただ，構造体のメンバ変数は，将来のバージョン
+アップに伴い変更される可能性もありますが，これらのマクロを使って参照す
+る限り，将来に渡って互換性が保証されます．
+
+※ Ver 1.0では teo_ で始まるマクロ名がありましたが，Ver 1.1以降
+   ではTeoで始める名前に変更されていますので，そちらを使うように
+   して下さい(もちろん昔の名前でも使えます)．
+
+-----------------------------------
+3.4.1 TEOFILEと TEOIMAGEに共通して使えるマクロ
+-----------------------------------
+---
+int TeoWidth(  TEOFILE *teofp) / int TeoWidth(  TEOIMAGE *image)
+int TeoHeight( TEOFILE *teofp) / int TeoHeight( TEOIMAGE *image)
+int TeoType(   TEOFILE *teofp) / int TeoType(   TEOIMAGE *image)
+int TeoBit(    TEOFILE *teofp) / int TeoBit(    TEOIMAGE *image)
+int TeoPlane(  TEOFILE *teofp) / int TeoPlane(  TEOIMAGE *image)
+int TeoFsize(  TEOFILE *teofp) / int TeoFsize(  TEOIMAGE *image)
+int TeoXoffset(TEOFILE *teofp) / int TeoXoffset(TEOIMAGE *image)
+int TeoYoffset(TEOFILE *teofp) / int TeoYoffset(TEOIMAGE *image)
+
+以上のマクロは，基本的に各構造体のメンバと１対１に対応しています．
+
+---
+int TeoXstart( TEOFILE *teofp) / int TeoXstart( TEOIMAGE *image)
+int TeoYstart( TEOFILE *teofp) / int TeoYstart( TEOIMAGE *image)
+int TeoXend(   TEOFILE *teofp) / int TeoXend(   TEOIMAGE *image)
+int TeoYend(   TEOFILE *teofp) / int TeoYend(   TEOIMAGE *image)
+
+以上のマクロは，左上の座標と右下の座標を表します．これらは前述の
+width/height/xoffset/yoffsetの組合せで表現できますが，必要に応じて利用
+して下さい．
+
+---
+int TeoIsBIT(    TEOFILE *teofp)  / int TeoIsBIT(    TEOIMAGE *image)
+int TeoIsUINT8(  TEOFILE *teofp)  / int TeoIsUINT8(  TEOIMAGE *image)
+int TeoIsSINT8(  TEOFILE *teofp)  / int TeoIsSINT8(  TEOIMAGE *image)
+int TeoIsUINT16( TEOFILE *teofp)  / int TeoIsUINT16( TEOIMAGE *image)
+int TeoIsSINT16( TEOFILE *teofp)  / int TeoIsSINT16( TEOIMAGE *image)
+int TeoIsUINT32( TEOFILE *teofp)  / int TeoIsUINT32( TEOIMAGE *image)
+int TeoIsSINT32( TEOFILE *teofp)  / int TeoIsSINT32( TEOIMAGE *image)
+int TeoIsFLOAT32(TEOFILE *teofp)  / int TeoIsFLOAT32(TEOIMAGE *image)
+int TeoIsFLOAT64(TEOFILE *teofp)  / int TeoIsFLOAT64(TEOIMAGE *image)
+
+以上のマクロは，マクロ名の画素値の型と実際の画素値の型が同じであれば真
+(非0値)，違っていれば偽(0)を返します．
+
+-----------------------------------
+3.4.2 TEOFILEにのみ使えるマクロ
+-----------------------------------
+
+int    TeoFrame(TEOFILE *teofp)
+int    TeoHsize(TEOFILE *teofp)
+FILE  *TeoFp(TEOFILE *teofp)
+int    TeoExtc(TEOFILE *teofp);
+char **TeoExtv(TEOFILE *teofp);
+int    TeoCurrent(TEOFILE *teofp);
+
+現バージョンでは，構造体のメンバと１対１に対応するマクロとなっています．
+
+-----------------------------------
+3.4.3 TEOIMAGEにのみ使えるマクロ
+-----------------------------------
+
+(void *)TeoData(TEOIMAGE *image)
+
+現バージョンでは，構造体のメンバと１対１に対応するマクロとなっています．
+
+=============================================
+3.5 その他
+=============================================
+
+---
+void TeoError(void);
+
+内部エラーが発生し，TEO関数群がNULLを返した場合に，この関数を呼び出す
+と，大域変数を参照して適切なエラーメッセージを標準エラーに表示した後，
+プログラムを終了します．
+
+※ libteo Ver 1.1以降，メッセージの内容が変わっています．
+   より詳細なエラーメッセージが表示されるようになりました．
+
+######################################################################
+４ 特殊用途向け関数群
+
+本節では，User Extensionなどの高度な機能を利用したい，余計な機能を持た
+ず高速に動作する関数を利用したい，等の特殊な用途向けの関数群について説
+明します．
+
+=============================================
+4.1 新規にファイルを作成
+=============================================
+
+動画ファイルを作成する関数は，実に多くのバリエーションがあります．引数
+に User Extensionを指定する場合と，指定しない場合の２通りに分けて説明
+します．
+
+-----------------------------------
+4.1.1 User Extensionを指定しないファイル作成
+-----------------------------------
+
+作成する画像フォーマットが {Teoであるか | Pnmであるか}の２通りがありま
+す．次に，圧縮形態として，{圧縮 | 非圧縮 | 環境変数により判別}の３通り
+があります．さらに，ファイルサイズや型は {明示的に指定 | 既にあるファ
+イルで指定}の２通りがあります．つまり，全部で 2×3×2=12通りの関数群が
+あります．「TEOフォーマット & 環境変数により判別」の２種類の関数は中レ
+ベル関数として既に前節で説明していますので，ここでは残りの10種類の関数
+をまとめて説明します．
+
+---
+TEOFILE *TeoCreateNonGzFile(char *filename,
+		     int width,int height,int xoffset,int yoffset,
+		     int type,int bit,
+		     int plane,int frame);
+TEOFILE *TeoCreateNonGzSimilarFile(char *filename,TEOFILE *teofp);
+TEOFILE *TeoCreateGzFile(char *filename,
+		     int width,int height,int xoffset,int yoffset,
+		     int type,int bit,
+		     int plane,int frame);
+TEOFILE *TeoCreateGzSimilarFile(char *filename,TEOFILE *teofp);
+TEOFILE *PnmCreateFile(char *filename,int width,int height,
+		   int type,int bit,int plane);
+TEOFILE *PnmCreateSimilarFile(char *filename,TEOFILE *teofp);
+TEOFILE *PnmCreateGzFile(char *filename,int width,int height,
+		     int type,int bit,int plane);
+TEOFILE *PnmCreateGzSimilarFile(char *filename,TEOFILE *teofp);
+TEOFILE *PnmCreateNonGzFile(char *filename,int width,int height,
+		     int type,int bit,int plane);
+TEOFILE *PnmCreateNonGzSimilarFile(char *filename,TEOFILE *teofp);
+
+名前の頭が Teoになっているものは TEOフォーマット，Pnmになっているもの
+は PNMフォーマットの画像を作成します．
+
+NonGzがついているものは非圧縮画像を作成，Gzがついているものは圧縮画像
+を作成します．NonGz/Gzのどちらもついていないものは環境変数を見て自動的
+に判別します．
+
+最後がFileになっているものは画像のサイズや型をパラメータで明示的に指
+定します．SimilarFileとなっているものは，既に存在する動画ファイルと同
+じサイズ・型のファイルを作成します．
+
+なお，最後が SimilarFileとなっている場合で，既に存在するファイルが 
+User Extensionを含んでいた場合，新たに生成されるファイルも自動的に同じ 
+User Extensionがコピーされます．
+
+低レベルな関数群であるため，余計なお節介は少なく，以下の１点だけです．
+ ○ファイル名が "-" の場合には，標準出力に書き出します．
+
+-----------------------------------
+4.1.2 User Extensionを指定するファイル作成
+-----------------------------------
+
+User Extensionが含まれますので，作成する画像フォーマットは Teoのみです
+(Pnmフォーマットには User Extensionはありません)．ファイルサイズや型は，
+すべて明示的に指定します．ただし，圧縮形態は，{圧縮 | 非圧縮 | 環境変
+数により判別}の３通りがあります．
+
+---
+TEOFILE *TeoCreateFileWithUserExtension(char *filename,
+                                        int width,int height,
+                                        int xoffset,int yoffset,
+                                        int type,int bit,
+                                        int plane,int frame,
+                                        int extc,char **extv);
+TEOFILE *TeoCreateNonGzFileWithUserExtension(char *filename,
+                                             int width,int height,
+                                             int xoffset,int yoffset,
+                                             int type,int bit,
+                                             int plane,int frame,
+                                             int extc,char **extv);
+TEOFILE *TeoCreateGzFileWithUserExtension(char *filename,
+                                          int width,int height,
+                                          int xoffset,int yoffset,
+                                          int type,int bit,
+                                          int plane,int frame,
+                                          int extc,char **extv);
+
+上記の３種類の関数
+	TeoCreateFileWithUserExtension,
+	TeoCreateNonGzFileWithUserExtension,
+	TeoCreateGzFileWithUserExtension
+は，それぞれ
+	TeoCreateFile,
+	TeoCreateNonGzFile,
+	TeoCreateGzFile 
+に User Extensionを書き込む機能を持たせたものです．引数 extc,extvが増
+えています．
+
+例えば，
+---
+extc = 3;
+extv[0] = "Generator    Tsai-Method-Package dist2undist";
+extv[1] = "ImageCenter  202.985252 258.470741";
+extv[2] = "FocalLength  18.403144";
+---
+となっている場合，作成されるファイルのヘッダーは以下のように，User
+Extensionが書き込まれます．
+---
+TEO 1 # generated by TEO library version Version 1.0
+#%      Generator       Tsai-Method-Package
+#% ImageCenter  202.985252 258.470741
+#% FocalLength  18.403144
+100 100 0 0
+S 16
+3 2
+ :
+---
+
+=============================================
+4.2 User Extensiobn(ユーザ拡張領域)へのアクセス
+=============================================
+
+---
+char *TeoGetUserExtension(TEOFILE *teofp,char *key);
+
+User Extensionの解析を助ける関数です．User Extensionのそれぞれの行を，
+スペースもしくはタブで区切られるカラムからなるものとして，第一カラムが 
+keyと一致するものを探します．戻り値は，第一カラムが一致した行の第二カ
+ラムの先頭ポインタです．一致するものがなければ NULLを返します．
+
+例えば，
+teofp->extc     = 3;
+teofp->extv[0]  = "Generator    Tsai-Method-Package dist2undist";
+teofp->extv[1]  = "ImageCenter  202.985252 258.470741";
+teofp->extv[2]  = "FocalLength  18.403144";
+
+となっている場合，
+char *ptr;
+ptr = TeoGetUserExtension(teofp,"ImageCenter");
+とすると，ptrは文字列 "202.985252 258.470741"を指します．
+
+
+=============================================
+4.3 内部で使用する関数群
+=============================================
+
+本節で述べる関数群は，libteo自体が内部で利用するものであり，libteo利用
+者が直接使うことは想定していません．しかし，場合によっては利用できるこ
+ともあるため，簡単に説明をします．なお，ここで紹介する関数群は，内部で
+使用している関数群の一部です．
+
+---
+int TeoIsLittleEndian(void);
+
+ENDIAN のテストを行います．使用しているマシンが，little endian なら 1
+big endian なら 0 を返します．
+
+---
+int TeoTransEndian(char *buf, int size);
+
+buf に与えたデータについてlittle endian <-> big endian の入れ換えを行
+います．
+
+---
+int TeoFreadEndian(char *buf, int size, int num);
+int TeoFwriteEndian(char *buf, int size, int num);
+
+Endianの違いを気にすることなく利用できる fread,fwriteで，常に Big
+Endianに統一されます．ただし，１フレーム分のデータを一度に読み書きする
+のであれば，これらの関数ではなく，TeoReadFrame() / TeoWriteFrame() を
+使用して下さい．画像を走査線ごとにアクセスするといった特別な場合にのみ
+利用して下さい．
+
+buf  : 確保したメモリの先頭ポインタ
+size : 1つのデータのサイズ
+num  : データの数
+
+---
+int TeoReadHeader(TEOFILE *teofp);
+
+TEOフォーマットのヘッダ情報を獲得します．TEOフォーマットのファイルをオー
+プンした直後にこの操作を行って下さい．infoにヘッダ情報がセットされます．
+また，ファイルポインタは最初のフレームの先頭に移動します．
+
+---
+int TeoWriteHeader(TEOFILE *teofp);
+
+TEO フォーマットのヘッダ情報を書き込みます．あらかじめinfoに必要な情報，
+(width/height/type/bit/plane/frameなど)をセットしてからこの関数を呼び
+出して下さい．
+
+---
+int PnmReadHeader(TEOFILE *teofp);
+
+PBM,PGM,PPMのraw形式(マジックナンバー P4,P5,P6)のファイルのヘッダを読
+んで，1フレームのTEOフォーマットとして扱います．
+
+---
+int PnmWriteHeader(TEOFILE *teofp);
+
+PNMで扱うことのできる画像形式(1frame,UNSIGNED)で
+bit 1 & plane 1
+bit 8 & plane 1
+bit 8 & plane 3
+について，PNM 形式のヘッダを出力します．
+
+######################################################################
+５ デバッグモード
+
+このライブラリは，余計なことをしないことを基本方針としているため，効率
+面で優れており，リアルタイム処理などのスピードを重視する用途にも十分利
+用可能です．その反面，エラーチェックなどを省いているために，エラーが発
+生した時の原因究明が難しく，初心者には扱いにくいという面もありました．
+
+そのため，Ver 1.1以降からは「デバッグモード」と呼ぶ新機能が追加されて
+います．デバッグモードでコンパイルされたプログラムは，実行時にさまざま
+なチェックを行い，怪しい動作があれば直ちに詳細な原因を表示してくれます．
+ただし，実行速度は落ちます．
+
+本ライブラリを利用するプログラマは，生産効率をあげるために，まず，デバッ
+グモードでコンパイルを行うことをお勧めします．十分にテストを行い，バグ
+が完全になくなったことを確認してから，デバッグモードをはずしてコンパイ
+ルして下さい．デバッグモードをはずしたバイナリは，従来と同じく「余計な
+こと」をしませんので高速に動作します．このようにして，安定で高速な実行
+バイナリを得ることができます．
+
+デバッグモードには，三つのレベルがあります．
+    Level-1 
+       ・TeoGetPixel,TeoPutPixelで(x,y,p)が範囲を越えていれば警告
+       ・TeoGetPixel,TeoPutPixelするときに，TEOIMAGEが NULLであればエラー
+       ・TeoAllocImageしたときに，画像の幅や高さが負の値になっていれば警告
+       ・TeoPutPixel,TeoGetPixel,TeoPutBit,TeoGetBit で, 指定した画素
+         の型と実際の画素の型のサイズが異っていれば警告
+    Level-2
+       ・TeoCloseFileした時に，最終フレームでないなら(WriteFrame忘れ)
+         であれば警告
+       ・TeoAllocImageしたときに，画像サイズが異常にでかい(100MB以上)とき警告
+       ・TeoOpenFile,TeoCreateFileで，ファイル名が *.teoで終っていなければ警告
+          (sprintfでファイル名を自動生成する時のバグを発見)
+
+    Level-3
+       ・その他すべての不審な挙動に警告を出す.
+
+デバッグモードを有効にするには, ソースを変更する必要は全くありません．
+コンパイル時に
+
+  -DTEO_DEBUG1
+  -DTEO_DEBUG2
+  -DTEO_DEBUG3
+  -DTEO_DEBUG_ALL
+
+のどれかのオプションを付けてください. 1,2,3 はデバッグレベルになります.
+ALLは全てのデバッグモードを有効にするオプションで，現在は TEO_DEBUG3と
+同じです．
+
+  -DTEO_DEBUG_ERROR
+
+のオプションを併用すると, 警告を出すところを全てエラーにして停止するよ
+うになります.
+
+
+######################################################################
+６ サンプルプログラム
+
+このプログラムは，第１引数に入力画像のファイル名を，第２引数に出力画像
+のファイル名を指定して実行すると，色を反転したネガ画像を生成します．
+
+/*****************************************
+ * Unsigned 8bitの画像を入力とし,        *
+ * ネガ画像を生成するプログラム          *
+ *                                       *
+ * (マルチプレーン・マルチフレーム対応)  *
+ *****************************************/
+
+#include <stdio.h>
+#include <teo.h>
+
+int main( int argc, char *argv[])
+{
+    int		x,y,f,p;
+    TEOFILE	*fileIn,*fileOut;
+    TEOIMAGE	*imgIn, *imgOut;
+    TEO_UINT8	pixel;
+
+    /* 入力画像のオープン
+       この時点でヘッダー情報が読みとられる */
+    if ((fileIn = TeoOpenFile(argv[1]))==NULL) TeoError();
+
+    /* このプログラムは Unsigned 8bitしか使えない */
+    if(TeoType(fileIn) != TEO_UNSIGNED || TeoBit(fileIn) != 8){
+      fprintf(stderr,"Wrong pixel type.\n");
+      exit(-1);
+    }
+
+    /* 出力画像を生成 (入力画像と同じサイズ・型)
+       この時点でヘッダー情報がファイルに書き出される */
+    fileOut= TeoCreateSimilarFile(argv[2],fileIn);
+
+    /* １フレーム分の画像情報を格納するのに必要なメモリを確保
+       サイズは引数の動画像を参照して決定する */
+    imgIn  = TeoAllocSimilarImage(fileIn);
+    imgOut = TeoAllocSimilarImage(fileOut);
+
+    for(f=0; f<TeoFrame(fileIn); f++){/* マルチフレームへの対応 */
+
+      /* １フレーム分読み込む
+         いちいちmallocすることなく，どんどん上書きしている */
+      TeoReadFrame(fileIn,imgIn); 
+
+      for (y=TeoYstart(fileIn); y<=TeoYend(fileIn); y++)
+	for (x=TeoXstart(fileIn); x<=TeoXend(fileIn); x++)
+	  for(p=0; p<TeoPlane(fileIn); p++){/* マルチプレーンへの対応 */
+
+	    pixel = TeoGetPixel(imgIn,x,y,p,TEO_UINT8);
+	    TeoPutPixel(imgOut,x,y,p,TEO_UINT8,255-pixel);
+	  }
+
+      /* １フレーム分のデータを書き出す */
+      TeoWriteFrame(fileOut,imgOut);
+    }
+
+    /* 画像のためのメモリを解放 */
+    TeoFreeImage(imgIn);
+    TeoFreeImage(imgOut);
+
+    /* 画像ファイルをクローズ */
+    TeoCloseFile(fileIn);
+    TeoCloseFile(fileOut);
+
+    return (int)0;
+}
+
+
+上記のソースをコンパイルするための Makefileの例を示します．ソースファ
+イルの名前が nega.c で，実行バイナリの名前が negaです．TEO関連のファ
+イルの場所は，各サイトにあわせて変更して下さい．筑波大画像研の場合は
+CFLAGS        = -DTEO_DEBUG_ALL -O -I/usr/local/Image/include -I.
+LDFLAGS	      = -L/usr/local/Image/lib
+と変更して下さい．
+なお，下記の例ではデバッグモードが有効になるようになっています．
+
+＝＝＝＝＝ Makefileの例 ＝＝＝＝＝
+CC	      = gcc
+CFLAGS        = -DTEO_DEBUG_ALL -O -I/usr/local/lab/include -I.
+LDFLAGS	      = -L/usr/local/lab/lib
+LIBS	      = -lteo -lm
+HDRS          =
+OBJS	      = nega.o
+PROGRAM	      = nega
+
+all:		$(PROGRAM)
+
+$(PROGRAM):     $(OBJS) $(HDRS)
+		$(CC) $(OBJS) $(LDFLAGS) $(LIBS) -o $(PROGRAM)
+
+clean:;		rm -f *.o *~ core $(PROGRAM)
+＝＝＝＝＝ ここまで ＝＝＝＝＝
+
+
+######################################################################
+７ 関数リファレンス
+
+関数・マクロのうち，主に一般ユーザに関係あるものを以下に列挙します．
+
+＝＝＝ ファイルアクセス関係 ＝＝＝
+TEOFILE *TeoOpenFile(char *filename);
+TEOFILE *TeoCreateFile(char *filename,
+		   int width,int height,int xoffset,int yoffset,
+		   int type,int bit,
+		   int plane,int frame);
+TEOFILE *TeoCreateSimilarFile(char *filename,TEOFILE *teofp);
+
+＝＝＝ 画像アクセス関係 ＝＝＝
+TEOIMAGE *TeoAllocSimilarImage(TEOFILE *teofp);
+TEOIMAGE *TeoAllocSimilarImage(TEOIMAGE *image);
+TEOIMAGE *TeoAllocImage(int width,int height,int xoffset,int yoffset,
+			int type,int bit,int plane);
+int TeoFreeImage(TEOIMAGE *image);
+int TeoReadFrame(TEOFILE *teofp,TEOIMAGE *image);
+int TeoWriteFrame(TEOFILE *teofp,TEOIMAGE *image);
+int TeoSetAbsFrame(TEOFILE *teofp, int frame);
+int TeoSetRelFrame(TEOFILE *teofp, int frame);
+int TeoCheckFrame(TEOFILE *teofp)
+
+＝＝＝ 画素アクセス関係 ＝＝＝
+ETYPE TeoGetPixel(TEOIMAGE *image,int index_x,int index_y,int index_p,
+		  ETYPE);
+ETYPE TeoPutPixel(TEOIMAGE *image,int index_x,int index_y,int index_p,
+		  ETYPE,ETYPE val);
+TEO_BIT TeoGetBit(TEOIMAGE *image,int index_x,int index_y,int index_p);
+TEO_BIT TeoPutBit(TEOIMAGE *image,int index_x,int index_y,int index_p,
+		  TEO_BIT val);
+
+＝＝＝ 構造体アクセスマクロ ＝＝＝
+int TeoWidth(  TEOFILE *teofp) / int TeoWidth(  TEOIMAGE *image)
+int TeoHeight( TEOFILE *teofp) / int TeoHeight( TEOIMAGE *image)
+int TeoType(   TEOFILE *teofp) / int TeoType(   TEOIMAGE *image)
+int TeoBit(    TEOFILE *teofp) / int TeoBit(    TEOIMAGE *image)
+int TeoPlane(  TEOFILE *teofp) / int TeoPlane(  TEOIMAGE *image)
+int TeoFsize(  TEOFILE *teofp) / int TeoFsize(  TEOIMAGE *image)
+int TeoXoffset(TEOFILE *teofp) / int TeoXoffset(TEOIMAGE *image)
+int TeoYoffset(TEOFILE *teofp) / int TeoYoffset(TEOIMAGE *image)
+
+int TeoXstart( TEOFILE *teofp) / int TeoXstart( TEOIMAGE *image)
+int TeoYstart( TEOFILE *teofp) / int TeoYstart( TEOIMAGE *image)
+int TeoXend(   TEOFILE *teofp) / int TeoXend(   TEOIMAGE *image)
+int TeoYend(   TEOFILE *teofp) / int TeoYend(   TEOIMAGE *image)
+
+int TeoIsBIT(    TEOFILE *teofp)  / int TeoIsBIT(    TEOIMAGE *image)
+int TeoIsUINT8(  TEOFILE *teofp)  / int TeoIsUINT8(  TEOIMAGE *image)
+int TeoIsSINT8(  TEOFILE *teofp)  / int TeoIsSINT8(  TEOIMAGE *image)
+int TeoIsUINT16( TEOFILE *teofp)  / int TeoIsUINT16( TEOIMAGE *image)
+int TeoIsSINT16( TEOFILE *teofp)  / int TeoIsSINT16( TEOIMAGE *image)
+int TeoIsUINT32( TEOFILE *teofp)  / int TeoIsUINT32( TEOIMAGE *image)
+int TeoIsSINT32( TEOFILE *teofp)  / int TeoIsSINT32( TEOIMAGE *image)
+int TeoIsFLOAT32(TEOFILE *teofp)  / int TeoIsFLOAT32(TEOIMAGE *image)
+int TeoIsFLOAT64(TEOFILE *teofp)  / int TeoIsFLOAT64(TEOIMAGE *image)
+
+int    TeoFrame(TEOFILE *teofp)
+int    TeoHsize(TEOFILE *teofp)
+FILE  *TeoFp(TEOFILE *teofp)
+int    TeoExtc(TEOFILE *teofp);
+char **TeoExtv(TEOFILE *teofp);
+int    TeoCurrent(TEOFILE *teofp);
+
+(void *)TeoData(TEOIMAGE *image)
+
+＝＝＝ その他 ＝＝＝
+
+void TeoError(void);
+
+
+######################################################################
+８ 最後に
+
+TEOを扱う基本ライブラリ libteoは，今後は基本的にバグフィックスの
+みのバージョンアップとします．より便利な機能を持った関数群は，別
+途ユーティリティライブラリ (libteoutil)として提供されいますので，
+そちらを併用することをお勧めします．
+
+TEOフォーマット，および libteoに関する疑問点やバグの指摘など，様々な情
+報は TEO@chino.it.okayama-u.ac.jp へお問い合わせ下さい．
+
+######################################################################
+
+							文責：向川康博

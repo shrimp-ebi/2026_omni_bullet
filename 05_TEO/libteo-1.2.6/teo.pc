@@ -1,0 +1,13 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+teo_binary_version=1.2.6
+
+Name: TEO
+Description: TEO Image Library
+Version: 1.2.6
+Libs: -L${libdir} -lteo
+Cflags: -I${includedir}
+

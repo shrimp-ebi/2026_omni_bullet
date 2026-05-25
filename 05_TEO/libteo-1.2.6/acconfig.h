@@ -1,0 +1,11 @@
+#undef SUPPORT_GZIP
+
+#undef HAVE_SYSTEM
+
+#undef HAVE_POPEN
+
+#undef DEFAULT_TMP
+
+#undef SUPPORT_SIGNAL_CATCH
+
+#undef CATCH_SIGNALS

@@ -1,0 +1,6 @@
+/mnt/c/2026_研究/2026_omni_bullet/05_TEO/プログラム/全天球画像でのバレットタイム10/build/CMakeFiles/spherical_bullettime.dir
+/mnt/c/2026_研究/2026_omni_bullet/05_TEO/プログラム/全天球画像でのバレットタイム10/build/CMakeFiles/edit_cache.dir
+/mnt/c/2026_研究/2026_omni_bullet/05_TEO/プログラム/全天球画像でのバレットタイム10/build/CMakeFiles/rebuild_cache.dir
+/mnt/c/2026_研究/2026_omni_bullet/05_TEO/プログラム/全天球画像でのバレットタイム10/build/src/CMakeFiles/src_lib.dir
+/mnt/c/2026_研究/2026_omni_bullet/05_TEO/プログラム/全天球画像でのバレットタイム10/build/src/CMakeFiles/edit_cache.dir
+/mnt/c/2026_研究/2026_omni_bullet/05_TEO/プログラム/全天球画像でのバレットタイム10/build/src/CMakeFiles/rebuild_cache.dir
