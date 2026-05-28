@@ -133,6 +133,106 @@ Image* image_create_like(Image *src) {
     return image_create(src->width, src->height, src->channels);
 }
 
+/* Gaussian blur を適用した画像を生成 */
+Image* image_gaussian_blur(Image *src, int ksize, double sigma) {
+    if (!src || !src->data) {
+        fprintf(stderr, "エラー: Gaussian blur の入力画像が無効です\n");
+        return NULL;
+    }
+    if (ksize <= 0 || (ksize % 2) == 0) {
+        fprintf(stderr, "エラー: ksize は奇数で指定してください\n");
+        return NULL;
+    }
+    if (sigma <= 0.0) {
+        sigma = 1.0;
+    }
+
+    Image *dst = image_create(src->width, src->height, src->channels);
+    if (!dst) {
+        return NULL;
+    }
+
+    int radius = ksize / 2;
+    double *kernel = (double*)malloc((size_t)ksize * sizeof(double));
+    if (!kernel) {
+        fprintf(stderr, "エラー: Gaussian kernel のメモリ確保に失敗しました\n");
+        image_free(dst);
+        return NULL;
+    }
+
+    double sum = 0.0;
+    for (int i = -radius; i <= radius; i++) {
+        kernel[i + radius] = exp(-(double)(i * i) / (2.0 * sigma * sigma));
+        sum += kernel[i + radius];
+    }
+    for (int i = 0; i < ksize; i++) {
+        kernel[i] /= sum;
+    }
+
+    for (int v = 0; v < src->height; v++) {
+        for (int u = 0; u < src->width; u++) {
+            double accum[4] = {0.0, 0.0, 0.0, 0.0};
+
+            for (int ky = -radius; ky <= radius; ky++) {
+                int yy = v + ky;
+                if (yy < 0) yy = 0;
+                if (yy >= src->height) yy = src->height - 1;
+
+                for (int kx = -radius; kx <= radius; kx++) {
+                    int xx = u + kx;
+                    if (xx < 0) xx = 0;
+                    if (xx >= src->width) xx = src->width - 1;
+
+                    int idx = (yy * src->width + xx) * src->channels;
+                    double w = kernel[ky + radius] * kernel[kx + radius];
+
+                    for (int c = 0; c < src->channels; c++) {
+                        accum[c] += (double)src->data[idx + c] * w;
+                    }
+                }
+            }
+
+            int out_idx = (v * src->width + u) * src->channels;
+            for (int c = 0; c < src->channels; c++) {
+                double val = accum[c];
+                if (val < 0.0) val = 0.0;
+                if (val > 255.0) val = 255.0;
+                dst->data[out_idx + c] = (uint8_t)(val + 0.5);
+            }
+        }
+    }
+
+    free(kernel);
+    return dst;
+}
+
+Image* image_difference(Image *a, Image *b)
+{
+    if (!a || !b) return NULL;
+    if (a->width != b->width || a->height != b->height || a->channels != b->channels) return NULL;
+
+    Image *dst = image_create_like(a);
+    if (!dst) return NULL;
+
+    int w = a->width;
+    int h = a->height;
+    int c = a->channels;
+    for (int v = 0; v < h; ++v) {
+        for (int u = 0; u < w; ++u) {
+            for (int ch = 0; ch < c; ++ch) {
+                int idx = (v * w + u) * c + ch;
+                int va = a->data[idx];
+                int vb = b->data[idx];
+                int diff = va - vb;
+                if (diff < 0) diff = -diff;
+                if (diff > 255) diff = 255;
+                dst->data[idx] = (uint8_t)diff;
+            }
+        }
+    }
+
+    return dst;
+}
 
 /* ===========================
  * 画素値の取得・設定

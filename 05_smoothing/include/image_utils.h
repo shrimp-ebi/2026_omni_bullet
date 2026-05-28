@@ -22,6 +22,8 @@ int image_save_png(const char *filename, Image *img);
 void image_free(Image *img);
 Image* image_create(int width, int height, int channels);
 Image* image_create_like(Image *src);
+Image* image_gaussian_blur(Image *src, int ksize, double sigma);
+Image* image_difference(Image *a, Image *b);
 void get_pixel(Image *img, int u, int v, uint8_t *rgb);
 void set_pixel(Image *img, int u, int v, const uint8_t *rgb);
 void get_pixel_bilinear(Image *img, double u, double v, uint8_t *rgb);

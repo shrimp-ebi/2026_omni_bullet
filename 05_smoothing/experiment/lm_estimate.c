@@ -22,8 +22,18 @@
 #define EPS_OMEGA   1e-8     /* 収束判定のしきい値 */
 #define MAX_ITER    100      /* 最大反復回数 */
 
-int main(void)
+int main(int argc, char **argv)
 {
+    int ksize = 5;
+    double sigma = 2.0;
+    if (argc >= 2) {
+        int v = atoi(argv[1]);
+        if (v > 0) ksize = v;
+    }
+    if (argc >= 3) {
+        double s = atof(argv[2]);
+        if (s > 0.0) sigma = s;
+    }
     const char *base_path = "images/base/base.jpg";
     const char *ref_path  = "images/reference/ref_w1_15_w2_30.jpg";
     const double omega_true_deg[3] = {15.0, 30.0, 0.0};
@@ -44,6 +54,36 @@ int main(void)
     int H = base->height;
     int u_min = W / 4,  u_max = 3 * W / 4;
     int v_min = H / 4,  v_max = 3 * H / 4;
+
+    Image *base_smooth = image_gaussian_blur(base, ksize, sigma);
+    if (!base_smooth) {
+        fprintf(stderr, "エラー: 基準画像の平滑化に失敗しました\n");
+        image_free(ref);
+        image_free(base);
+        return 1;
+    }
+    Image *ref_smooth = image_gaussian_blur(ref, ksize, sigma);
+    if (!ref_smooth) {
+        fprintf(stderr, "エラー: 参照画像の平滑化に失敗しました\n");
+        image_free(base_smooth);
+        image_free(ref);
+        image_free(base);
+        return 1;
+    }
+
+    printf("使用する平滑化パラメータ: ksize=%d sigma=%.3f\n", ksize, sigma);
+
+    /* 差分画像を保存 */
+    Image *base_diff = image_difference(base, base_smooth);
+    if (base_diff) {
+        image_save_png("base_diff.png", base_diff);
+        image_free(base_diff);
+    }
+    Image *ref_diff = image_difference(ref, ref_smooth);
+    if (ref_diff) {
+        image_save_png("ref_diff.png", ref_diff);
+        image_free(ref_diff);
+    }
 
     printf("画像サイズ: %d x %d\n", W, H);
     printf("比較領域: u=[%d,%d]  v=[%d,%d]\n\n", u_min, u_max, v_min, v_max);
@@ -92,7 +132,7 @@ int main(void)
         Matrix3x3 R = rodrigues(omega_init);
         double C = C_INIT;
 
-        double E = compute_objective_3param(base, ref, R, u_min, v_min, u_max, v_max);
+        double E = compute_objective_3param(base_smooth, ref_smooth, R, u_min, v_min, u_max, v_max);
         printf("初期 E = %f\n\n", E);
 
         /* ── LM 反復 ──────────────────────────────────────── */
@@ -101,11 +141,11 @@ int main(void)
 
             /* (a) 勾配 */
             double grad[3];
-            compute_gradient_3param(base, ref, R, u_min, v_min, u_max, v_max, grad);
+            compute_gradient_3param(base_smooth, ref_smooth, R, u_min, v_min, u_max, v_max, grad);
 
             /* (b) ヘッセ行列 */
             double hessian[3][3];
-            compute_hessian_3param(base, ref, R, u_min, v_min, u_max, v_max, hessian);
+            compute_hessian_3param(base_smooth, ref_smooth, R, u_min, v_min, u_max, v_max, hessian);
 
             /* (c) LM 連立方程式  (H + C*diag(H)) Δω = -g */
             double A[3][3];
@@ -131,7 +171,7 @@ int main(void)
             Matrix3x3 R_new = matrix_multiply(dR, R);
 
             /* (f) 目的関数 */
-            double E_new = compute_objective_3param(base, ref, R_new, u_min, v_min, u_max, v_max);
+            double E_new = compute_objective_3param(base_smooth, ref_smooth, R_new, u_min, v_min, u_max, v_max);
 
             /* ||Δω|| */
             double norm_dw = sqrt(delta_omega[0]*delta_omega[0]
@@ -184,6 +224,8 @@ int main(void)
         printf("最終 E = %f\n\n", E);
     }
 
+    image_free(base_smooth);
+    image_free(ref_smooth);
     image_free(base);
     image_free(ref);
     return 0;
