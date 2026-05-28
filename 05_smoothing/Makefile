@@ -50,6 +50,14 @@ $(BUILD_DIR)/lm_estimate: $(EXP_DIR)/lm_estimate.c \
                            $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+# LM法（初期値をコマンドライン引数で受け取る版）
+lm_estimate_single: $(BUILD_DIR)/lm_estimate_single
+
+$(BUILD_DIR)/lm_estimate_single: $(EXP_DIR)/lm_estimate_single.c \
+                                  $(EXP_DIR)/objective_3param.c \
+                                  $(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 # 初期値別収束実験（3ケース）
 lm_convergence_cases: $(BUILD_DIR)/lm_convergence_cases
 

@@ -337,3 +337,72 @@ void image_info(Image *img) {
                img->data[0], img->data[1], img->data[2]);
     }
 }
+
+Image *image_gaussian_blur(Image *src, int kernel_size, double sigma)
+{
+    int W = src->width;
+    int H = src->height;
+    int C = src->channels;
+    int half = kernel_size / 2;
+
+    /* ガウスカーネルを作る */
+    double *kernel = (double *)malloc(kernel_size * sizeof(double));
+    if (!kernel) return NULL;
+
+    double sum = 0.0;
+    for (int i = 0; i < kernel_size; i++) {
+        int x = i - half;
+        kernel[i] = exp(-(double)(x * x) / (2.0 * sigma * sigma));
+        sum += kernel[i];
+    }
+    /* 正規化（合計が1になるように） */
+    for (int i = 0; i < kernel_size; i++)
+        kernel[i] /= sum;
+
+    /* 出力画像を作る */
+    Image *dst = image_create(W, H, C);
+    if (!dst) { free(kernel); return NULL; }
+
+    /* 中間バッファ（水平方向のぼかし結果を一時保存） */
+    double *tmp = (double *)malloc(W * H * C * sizeof(double));
+    if (!tmp) { image_free(dst); free(kernel); return NULL; }
+
+    /* 水平方向にぼかす */
+    for (int v = 0; v < H; v++) {
+        for (int u = 0; u < W; u++) {
+            for (int c = 0; c < C; c++) {
+                double acc = 0.0;
+                for (int k = 0; k < kernel_size; k++) {
+                    /* 水平方向は周期境界（全方位画像なので左右がつながっている） */
+                    int uu = ((u - half + k) % W + W) % W;
+                    acc += kernel[k] * (double)src->data[(v * W + uu) * C + c];
+                }
+                tmp[(v * W + u) * C + c] = acc;
+            }
+        }
+    }
+
+    /* 垂直方向にぼかす */
+    for (int v = 0; v < H; v++) {
+        for (int u = 0; u < W; u++) {
+            for (int c = 0; c < C; c++) {
+                double acc = 0.0;
+                for (int k = 0; k < kernel_size; k++) {
+                    /* 垂直方向はクランプ（上下端で折り返さない） */
+                    int vv = v - half + k;
+                    if (vv < 0) vv = 0;
+                    if (vv >= H) vv = H - 1;
+                    acc += kernel[k] * tmp[(vv * W + u) * C + c];
+                }
+                double val = acc;
+                if (val < 0.0) val = 0.0;
+                if (val > 255.0) val = 255.0;
+                dst->data[(v * W + u) * C + c] = (uint8_t)val;
+            }
+        }
+    }
+
+    free(tmp);
+    free(kernel);
+    return dst;
+}
