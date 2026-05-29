@@ -63,7 +63,17 @@ Vector3D compute_ey(Vector3D ez, Vector3D ex);
 /* グレースケール値をバイリニア補間で取得 */
 double image_gray_bilinear(Image *img, double u, double v);
 
-/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算（中央差分） */
+/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算
+ * 
+ * 【方式1】中央差分による微分（ガウシアン重み付け） */
+void image_derivative_theta_phi_central(Image *img, double u, double v,
+                                        double *dS_dtheta, double *dS_dphi);
+
+/* 【方式2】5×5 Sobelフィルタ（GaussianBlur後の微分） */
+void image_derivative_theta_phi_sobel(Image *img, double u, double v,
+                                      double *dS_dtheta, double *dS_dphi);
+
+/* デフォルト: Sobel版 */
 void image_derivative_theta_phi(Image *img, double u, double v,
                                 double *dS_dtheta, double *dS_dphi);
 

@@ -54,8 +54,24 @@ $(BUILD_DIR)/lm_estimate: $(EXP_DIR)/lm_estimate.c \
 lm_estimate_single: $(BUILD_DIR)/lm_estimate_single
 
 $(BUILD_DIR)/lm_estimate_single: $(EXP_DIR)/lm_estimate_single.c \
-                                  $(EXP_DIR)/objective_3param.c \
+                                  $(EXP_DIR)/objective_3param_central.c \
                                   $(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# LM法（中央差分版）
+lm_estimate_single_central: $(BUILD_DIR)/lm_estimate_single_central
+
+$(BUILD_DIR)/lm_estimate_single_central: $(EXP_DIR)/lm_estimate_single.c \
+                                          $(EXP_DIR)/objective_3param_central.c \
+                                          $(COMMON_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# LM法（05_TEO風の平滑化処理を使う版）
+lm_estimate_single_teo: $(BUILD_DIR)/lm_estimate_single_teo
+
+$(BUILD_DIR)/lm_estimate_single_teo: $(EXP_DIR)/lm_estimate_single_teo.c \
+                                      $(EXP_DIR)/objective_3param.c \
+                                      $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # 初期値別収束実験（3ケース）

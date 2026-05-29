@@ -232,9 +232,13 @@ double image_gray_bilinear(Image *img, double u, double v) {
          + g11 * fu         * fv;
 }
 
-/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算（中央差分） */
-void image_derivative_theta_phi(Image *img, double u, double v,
-                                double *dS_dtheta, double *dS_dphi) {
+/* ===========================
+ * 微分関数（2種類）
+ * =========================== */
+
+/* 【方式1】中央差分による微分（ガウシアン重み付け） */
+void image_derivative_theta_phi_central(Image *img, double u, double v,
+                                        double *dS_dtheta, double *dS_dphi) {
     int W = img->width;
     int H = img->height;
     const double dtheta = 2.0 * M_PI / (double)W;
@@ -272,6 +276,56 @@ void image_derivative_theta_phi(Image *img, double u, double v,
     }
     double dS_dv = sum_phi;
     *dS_dphi = dS_dv * (-1.0 / dphi);
+}
+
+/* 【方式2】5×5 Sobelフィルタ（GaussianBlur後の微分） */
+static double image_sobel5_dx(Image *img, double u, double v)
+{
+    static const double deriv[5] = { 1.0, -8.0, 0.0, 8.0, -1.0 };
+    static const double smooth[5] = { 1.0, 4.0, 6.0, 4.0, 1.0 };
+    double sum = 0.0;
+
+    for (int dy = -2; dy <= 2; dy++) {
+        double wy = smooth[dy + 2];
+        for (int dx = -2; dx <= 2; dx++) {
+            double wx = deriv[dx + 2];
+            sum += wy * wx * image_gray_bilinear(img, u + (double)dx, v + (double)dy);
+        }
+    }
+
+    return sum / 192.0;  /* 16*12 = 192 で正規化 */
+}
+
+static double image_sobel5_dy(Image *img, double u, double v)
+{
+    static const double deriv[5] = { 1.0, -8.0, 0.0, 8.0, -1.0 };
+    static const double smooth[5] = { 1.0, 4.0, 6.0, 4.0, 1.0 };
+    double sum = 0.0;
+
+    for (int dy = -2; dy <= 2; dy++) {
+        double wy = deriv[dy + 2];
+        for (int dx = -2; dx <= 2; dx++) {
+            double wx = smooth[dx + 2];
+            sum += wy * wx * image_gray_bilinear(img, u + (double)dx, v + (double)dy);
+        }
+    }
+
+    return sum / 192.0;
+}
+
+/* 参照画像上での ∂S/∂θ, ∂S/∂φ を計算（GaussianBlur + Sobel 5x5） */
+void image_derivative_theta_phi(Image *img, double u, double v,
+                                double *dS_dtheta, double *dS_dphi)
+{
+    *dS_dtheta = image_sobel5_dx(img, u, v);
+    *dS_dphi   = image_sobel5_dy(img, u, v);
+}
+
+/* Sobel版の明示的エイリアス */
+void image_derivative_theta_phi_sobel(Image *img, double u, double v,
+                                      double *dS_dtheta, double *dS_dphi)
+{
+    image_derivative_theta_phi(img, u, v, dS_dtheta, dS_dphi);
 }
 
 /* ∂θ/∂X, ∂θ/∂Y, ∂θ/∂Z, ∂φ/∂X, ∂φ/∂Y, ∂φ/∂Z を計算 */
