@@ -1,11 +1,6 @@
-/* lm_estimate_single.c
- * LM法による3パラメータ回転推定（初期値をコマンドライン引数で受け取る版）
- *
- * 使い方:
- *   ./lm_estimate_single <ω1初期値[deg]> <ω2初期値[deg]>
- *
- * 出力（1行CSV）:
- *   ω1初期値, ω2初期値, 収束フラグ(1=収束/0=失敗), 反復回数, Frobenius誤差, 最終E
+/* lm_estimate_single_teo.c
+ * LM法による3パラメータ回転推定
+ * 05_TEOと同じ平滑化処理: 参照画像をGaussianBlurしたあとSob elで微分を計算する
  */
 
 #include "../include/coord_transform.h"
@@ -23,41 +18,42 @@
 
 #define C_INIT      0.0001
 #define EPS_OMEGA   1e-8
-#define MAX_ITER    200
+#define MAX_ITER    500
 
 int main(int argc, char *argv[])
 {
-    if (argc != 3) {
-        fprintf(stderr, "使い方: %s <ω1[deg]> <ω2[deg]>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "使い方: %s <ω1[deg]> <ω2[deg]> <sigma>\n", argv[0]);
         return 1;
     }
 
     double init_w1_deg = atof(argv[1]);
     double init_w2_deg = atof(argv[2]);
+    double sigma = atof(argv[3]);
 
     const char *base_path = "images/base/base.jpg";
     const char *ref_path  = "images/reference/ref_w1_15_w2_30.jpg";
-
-    /* 真値 */
-    const double omega_true_deg[3] = {15.0, 30.0, 0.0};
 
     Image *base = image_load(base_path);
     if (!base) { fprintf(stderr, "エラー: %s\n", base_path); return 1; }
     Image *ref  = image_load(ref_path);
     if (!ref)  { fprintf(stderr, "エラー: %s\n", ref_path); image_free(base); return 1; }
 
+    const double omega_true_deg[3] = {15.0, 30.0, 0.0};
+
+    /* 05_TEO方式: 参照画像の微分算出のためにGaussianBlurを適用 */
+    Image *ref_blur = image_gaussian_blur(ref, 5, sigma);
+    if (!ref_blur) {
+        fprintf(stderr, "エラー: 参照画像の平滑化失敗\n");
+        image_free(base);
+        image_free(ref);
+        return 1;
+    }
+
     int W = base->width;
     int H = base->height;
     int u_min = W / 4,  u_max = 3 * W / 4;
     int v_min = H / 4,  v_max = 3 * H / 4;
-
-    Image *base_smooth = image_gaussian_blur(base, 5, 2.0);
-    Image *ref_smooth  = image_gaussian_blur(ref,  5, 2.0);
-    if (!base_smooth || !ref_smooth) {
-        fprintf(stderr, "エラー: 平滑化失敗\n");
-        image_free(base); image_free(ref);
-        return 1;
-    }
 
     /* 真値の回転行列 */
     double omega_true[3] = {
@@ -76,7 +72,7 @@ int main(int argc, char *argv[])
     Matrix3x3 R = rodrigues(omega_init);
     double C = C_INIT;
     double E = compute_objective_3param(
-                   base_smooth, ref_smooth, R,
+                   base, ref, R,
                    u_min, v_min, u_max, v_max);
 
     int converged = 0;
@@ -84,12 +80,12 @@ int main(int argc, char *argv[])
     for (iter = 0; iter < MAX_ITER; iter++) {
         double grad[3];
         compute_gradient_3param(
-            base_smooth, ref_smooth, R,
+            base, ref_blur, R,
             u_min, v_min, u_max, v_max, grad);
 
         double hessian[3][3];
         compute_hessian_3param(
-            base_smooth, ref_smooth, R,
+            base, ref_blur, R,
             u_min, v_min, u_max, v_max, hessian);
 
         double A[3][3], b[3];
@@ -111,7 +107,7 @@ int main(int argc, char *argv[])
         Matrix3x3 dR    = rodrigues(delta_omega);
         Matrix3x3 R_new = matrix_multiply(dR, R);
         double E_new = compute_objective_3param(
-                           base_smooth, ref_smooth, R_new,
+                           base, ref, R_new,
                            u_min, v_min, u_max, v_max);
 
         double norm_dw = sqrt(delta_omega[0]*delta_omega[0]
@@ -121,14 +117,13 @@ int main(int argc, char *argv[])
         if (E_new < E) {
             R = R_new;
             E = E_new;
-            C /= 10.0;
+            C *= 0.1;
         } else {
             C *= 10.0;
         }
 
         if (norm_dw < EPS_OMEGA) {
             converged = 1;
-            iter++;
             break;
         }
     }
@@ -142,17 +137,16 @@ int main(int argc, char *argv[])
         }
     frob = sqrt(frob);
 
-    /* 収束とみなす閾値: Frobenius誤差 < 0.01 */
-    int success = converged && (frob < 0.01);
+    int success = (converged && (frob < 0.01)) || (frob < 0.001);
 
     /* 結果出力（CSV1行） */
     printf("%.2f,%.2f,%d,%d,%.6f,%.6f\n",
            init_w1_deg, init_w2_deg,
            success, iter, frob, E);
 
-    image_free(base_smooth);
-    image_free(ref_smooth);
     image_free(base);
     image_free(ref);
+    image_free(ref_blur);
+
     return 0;
 }

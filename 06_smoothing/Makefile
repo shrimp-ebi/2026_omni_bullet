@@ -8,7 +8,7 @@ EXP_DIR = experiment
 
 COMMON_OBJS = $(BUILD_DIR)/coord_transform.o $(BUILD_DIR)/rotation.o $(BUILD_DIR)/vector_math.o $(BUILD_DIR)/image_utils.o
 
-.PHONY: scan_3param scan_2d lm_estimate lm_convergence_cases lm_scan_omega1 lm_scan_omega2 create_reference_3param clean help
+.PHONY: scan_3param scan_2d lm_estimate_single lm_convergence_cases lm_scan_omega1 lm_scan_omega2 create_reference_3param clean help
 
 $(BUILD_DIR)/coord_transform.o: $(SRC_DIR)/coord_transform.c
 	@mkdir -p $(BUILD_DIR)
@@ -42,36 +42,12 @@ $(BUILD_DIR)/scan_2d: $(EXP_DIR)/scan_2d.c \
                        $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# LM法による3パラメータ回転推定
-lm_estimate: $(BUILD_DIR)/lm_estimate
-
-$(BUILD_DIR)/lm_estimate: $(EXP_DIR)/lm_estimate.c \
-                           $(EXP_DIR)/objective_3param.c \
-                           $(COMMON_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-# LM法（初期値をコマンドライン引数で受け取る版）
+# LM法（TEO方式: ref画像のみ平滑化）
 lm_estimate_single: $(BUILD_DIR)/lm_estimate_single
 
 $(BUILD_DIR)/lm_estimate_single: $(EXP_DIR)/lm_estimate_single.c \
-                                  $(EXP_DIR)/objective_3param_central.c \
+                                  $(EXP_DIR)/objective_3param.c \
                                   $(COMMON_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-# LM法（中央差分版）
-lm_estimate_single_central: $(BUILD_DIR)/lm_estimate_single_central
-
-$(BUILD_DIR)/lm_estimate_single_central: $(EXP_DIR)/lm_estimate_single.c \
-                                          $(EXP_DIR)/objective_3param_central.c \
-                                          $(COMMON_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-# LM法（05_TEO風の平滑化処理を使う版）
-lm_estimate_single_teo: $(BUILD_DIR)/lm_estimate_single_teo
-
-$(BUILD_DIR)/lm_estimate_single_teo: $(EXP_DIR)/lm_estimate_single_teo.c \
-                                      $(EXP_DIR)/objective_3param.c \
-                                      $(COMMON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # 初期値別収束実験（3ケース）

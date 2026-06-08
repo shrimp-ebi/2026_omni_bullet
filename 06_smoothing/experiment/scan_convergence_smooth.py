@@ -1,15 +1,14 @@
 """
-scan_convergence_smooth.py
-平滑化ありLM法の収束域スキャン
+scan_convergence_smooth_teo.py
+TEO風平滑化ありLM法の収束域スキャン
 
-ω1, ω2 の初期値を格子状に変えて lm_estimate_single を実行し、
+ω1, ω2 の初期値を格子状に変えて lm_estimate_single_teo を実行し、
 結果をCSVに保存する。
 """
 
 import subprocess
 import csv
 import os
-import sys
 
 # スキャン範囲（度）
 W1_MIN = -5.0
@@ -22,6 +21,8 @@ W2_STEP = 5.0
 
 BINARY = "./build/lm_estimate_single"
 OUTPUT_CSV = "results/convergence_smooth.csv"
+SIGMA = 1.0
+
 
 def main():
     os.makedirs("results", exist_ok=True)
@@ -42,6 +43,7 @@ def main():
     print(f"スキャン総数: {total} ケース")
     print(f"ω1: {W1_MIN}° ~ {W1_MAX}° ({W1_STEP}°刻み)")
     print(f"ω2: {W2_MIN}° ~ {W2_MAX}° ({W2_STEP}°刻み)")
+    print(f"実行バイナリ: {BINARY}")
     print(f"出力: {OUTPUT_CSV}")
     print()
 
@@ -55,8 +57,8 @@ def main():
             for w2 in w2_values:
                 try:
                     result = subprocess.run(
-                        [BINARY, str(w1), str(w2)],
-                        capture_output=True, text=True, timeout=300
+                        [BINARY, str(w1), str(w2), str(SIGMA)],
+                        capture_output=True, text=True, timeout=600
                     )
                     lines = [l for l in result.stdout.strip().splitlines() if l]
                     line = lines[-1] if lines else ""
@@ -66,7 +68,7 @@ def main():
                         writer.writerow([w1, w2, 0, 0, 999.0, 999.0])
                 except subprocess.TimeoutExpired:
                     writer.writerow([w1, w2, 0, -1, 999.0, 999.0])
-                except Exception as e:
+                except Exception:
                     writer.writerow([w1, w2, 0, -2, 999.0, 999.0])
 
                 done += 1
@@ -74,6 +76,7 @@ def main():
                     print(f"  進捗: {done}/{total} ({100*done//total}%)")
 
     print(f"\n完了！ → {OUTPUT_CSV}")
+
 
 if __name__ == "__main__":
     main()

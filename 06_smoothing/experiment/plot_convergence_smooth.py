@@ -1,6 +1,6 @@
 """
 plot_convergence_smooth.py
-平滑化方式の違いによる収束域を2枚並べて比較する
+平滑化あり（ref画像のみ / TEO方式）の収束域を表示する
 """
 
 import pandas as pd
@@ -24,12 +24,18 @@ for fp in font_candidates:
         plt.rcParams["font.family"] = prop.get_name()
         break
 
-CSV_SMOOTH = "results/convergence_smooth.csv"
-CSV_TEO    = "results/convergence_smooth_teo.csv"
-OUTPUT_PNG = "results/convergence_smooth_compare.png"
+CSV_INPUT  = "results/convergence_smooth.csv"
+OUTPUT_PNG = "results/convergence_smooth.png"
+TITLE      = "平滑化あり（ref画像のみ）収束域"
 
 
-def build_map(df):
+def main():
+    if not os.path.exists(CSV_INPUT):
+        print(f"CSVが見つかりません: {CSV_INPUT}")
+        return
+
+    df = pd.read_csv(CSV_INPUT)
+
     w1_vals = sorted(df["w1_init"].unique())
     w2_vals = sorted(df["w2_init"].unique())
     w1_idx = {v: i for i, v in enumerate(w1_vals)}
@@ -39,63 +45,34 @@ def build_map(df):
         i = w2_idx[row["w2_init"]]
         j = w1_idx[row["w1_init"]]
         Z[i, j] = row["success"]
-    return Z, w1_vals, w2_vals
 
+    fig, ax = plt.subplots(figsize=(9, 7))
 
-def plot_panel(ax, Z, w1_vals, w2_vals, title):
     im = ax.imshow(
         Z, origin="lower", aspect="auto",
         extent=[float(min(w1_vals)), float(max(w1_vals)),
                 float(min(w2_vals)), float(max(w2_vals))],
         cmap="RdYlGn", vmin=0, vmax=1
     )
-    ax.axvline(x=15.0, color="blue",  linewidth=1.5, linestyle="--", label="真値 ω1=15°")
-    ax.axhline(y=30.0, color="cyan",  linewidth=1.5, linestyle="--", label="真値 ω2=30°")
+    ax.axvline(x=15.0, color="blue", linewidth=1.5, linestyle="--", label="真値 ω1=15°")
+    ax.axhline(y=30.0, color="cyan", linewidth=1.5, linestyle="--", label="真値 ω2=30°")
     ax.set_xlabel("ω1 初期値 [deg]")
     ax.set_ylabel("ω2 初期値 [deg]")
-    ax.set_title(title)
-    ax.legend(loc="upper right", fontsize=8)
-    return im
+    ax.set_title(TITLE)
+    ax.legend(loc="upper right", fontsize=9)
+    fig.colorbar(im, ax=ax, label="収束成功 (1=成功, 0=失敗)")
 
-
-def main():
-    for path in [CSV_SMOOTH, CSV_TEO]:
-        if not os.path.exists(path):
-            print(f"CSVが見つかりません: {path}")
-            return
-
-    df_smooth = pd.read_csv(CSV_SMOOTH)
-    df_teo    = pd.read_csv(CSV_TEO)
-
-    Z_smooth, w1_s, w2_s = build_map(df_smooth)
-    Z_teo,    w1_t, w2_t = build_map(df_teo)
-
-    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-
-    im1 = plot_panel(axes[0], Z_smooth, w1_s, w2_s,
-                     "base+ref 両方平滑化 (lm_estimate_single)")
-    im2 = plot_panel(axes[1], Z_teo,    w1_t, w2_t,
-                     "ref のみ平滑化 / TEO方式 (lm_estimate_single_teo)")
-
-    fig.colorbar(im1, ax=axes[0], label="収束成功 (1=成功, 0=失敗)")
-    fig.colorbar(im2, ax=axes[1], label="収束成功 (1=成功, 0=失敗)")
-
-    success_smooth = df_smooth["success"].sum()
-    success_teo    = df_teo["success"].sum()
-    total_smooth   = len(df_smooth)
-    total_teo      = len(df_teo)
+    success = df["success"].sum()
+    total   = len(df)
     fig.suptitle(
-        f"平滑化方式比較  |  "
-        f"両方平滑化: {success_smooth}/{total_smooth} 収束  |  "
-        f"TEO方式: {success_teo}/{total_teo} 収束",
-        fontsize=13
+        f"{TITLE}  |  {success}/{total} 収束 ({100 * success // total}%)",
+        fontsize=12
     )
 
     plt.tight_layout()
     plt.savefig(OUTPUT_PNG, dpi=150)
     print(f"保存: {OUTPUT_PNG}")
-    print(f"  両方平滑化: {success_smooth}/{total_smooth} ({100*success_smooth//total_smooth}%) 収束")
-    print(f"  TEO方式:    {success_teo}/{total_teo} ({100*success_teo//total_teo}%) 収束")
+    print(f"  収束: {success}/{total} ({100 * success // total}%)")
 
 
 if __name__ == "__main__":

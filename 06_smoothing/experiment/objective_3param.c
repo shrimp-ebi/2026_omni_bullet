@@ -139,7 +139,7 @@ void compute_gradient_3param(
 
             /* ∂S/∂θ, ∂S/∂φ（参照画像の微分） */
             double dS_dtheta, dS_dphi;
-            image_derivative_theta_phi(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
+            image_derivative_theta_phi_central(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
 
             /* ∂θ/∂X', ∂φ/∂X' など（式3.13） */
             double theta_p, phi_p;
@@ -206,7 +206,7 @@ void compute_hessian_3param(
 
             /* ∂S/∂θ, ∂S/∂φ */
             double dS_dtheta, dS_dphi;
-            image_derivative_theta_phi(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
+            image_derivative_theta_phi_central(ref, u_ref, v_ref, &dS_dtheta, &dS_dphi);
 
             /* ∂θ/∂X', ∂φ/∂X' など */
             double theta_p, phi_p;
