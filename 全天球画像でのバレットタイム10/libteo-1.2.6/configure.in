@@ -1,0 +1,95 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(src/teo.h)
+AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE(libteo,1.2.6,no-define)
+AM_PROG_LIBTOOL
+
+TEO_MAJOR_VERSION=1
+TEO_MINOR_VERSION=2
+TEO_MICRO_VERSION=6
+VERSION=$TEO_MAJOR_VERSION.$TEO_MINOR_VERSION.$TEO_MICRO_VERSION
+
+dnl Checks for programs.
+AC_PROG_CC
+AC_PROG_RANLIB
+AC_PROG_INSTALL
+AC_PROG_LIBTOOL
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(unistd.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+
+dnl Checks for library functions.
+AC_FUNC_MEMCMP
+AC_TYPE_SIGNAL
+AC_FUNC_VPRINTF
+
+AC_CANONICAL_HOST
+
+AC_MSG_CHECKING(if --enable-gzip option specified)
+AC_ARG_ENABLE(gzip,
+	[  --enable-gzip[=PATH]	  Use gzip command.[default=/usr/bin/gzip]],
+	[teo_gzippath=$enableval],
+	[teo_gzippath="yes"])
+AC_MSG_RESULT($teo_gzip)
+if test "x$enable_gzip" != "xno"; then
+	if test "$teo_gzippath" = "yes"; then
+		teo_gzippath=/usr/bin/gzip
+	fi
+	AC_DEFINE_UNQUOTED(SUPPORT_GZIP,"$teo_gzippath", [gzip command path])
+
+	AC_CHECK_LIB(c, system,
+		[teo_system="yes"], [teo_system="no"])
+	if test "$teo_system" = "yes"; then
+		AC_DEFINE(HAVE_SYSTEM)
+	fi
+	AC_CHECK_LIB(c, popen,
+		[teo_popen="yes"], [teo_popen="no"])
+	if test "$teo_popen" = "yes"; then
+		AC_DEFINE(HAVE_POPEN)
+	fi
+
+	AC_ARG_WITH(tmp,
+		[  --with-tmp=DIR	  path to temporary directory [default /tmp]],
+	[teo_tmp=$withval], [teo_tmp="/tmp"])
+	if test $teo_tmp = "yes"; then
+		teo_tmp="/tmp"
+	fi
+	AC_DEFINE_UNQUOTED(DEFAULT_TMP,"$teo_tmp", [default tmp dir])
+fi
+
+AC_MSG_CHECKING(if --enable-signal-trap option specified)
+AC_ARG_ENABLE(signal-trap,
+	[  --enable-signal-trap[=signals]
+			  Use trapping signals.],
+	[teo_signals=$enableval],
+	[teo_signals="yes"])
+if test "x$enable_signal_trap" != "xno"; then
+	if test "$teo_signals" = "yes"; then
+		teo_signals="SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGABRT,SIGFPE,SIGBUS,SIGSEGV,SIGPIPE,SIGTERM"
+	fi
+	teo_signals="{$teo_signals,0}"
+	AC_DEFINE(SUPPORT_SIGNAL_CATCH)
+	AC_DEFINE_UNQUOTED(CATCH_SIGNALS, $teo_signals, [catch signals])
+fi
+
+AC_ARG_WITH(pkgconfig-dir,      [  --with-pkgconfig-dir=PATH
+			  path to pkgconfig [default /usr/lib/pkgconfig] ],
+	[pkgconfig_dir="$withval"],
+	[pkgconfig_dir="/usr/lib/pkgconfig"])
+AC_SUBST(pkgconfig_dir)
+
+AC_OUTPUT([
+Makefile
+src/Makefile
+doc/Makefile
+macros/Makefile
+teo.pc
+libteo.spec
+])

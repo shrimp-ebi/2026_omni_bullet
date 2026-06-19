@@ -1,0 +1,176 @@
+2005-08-19    <t.kato@ieee.org>
+
+	* src/: fileio.c:
+	PNMのヘッダ読み込み部分でサイズとグレイレベルの間が改行していない
+	場合に対応
+	Release-1.2.5
+
+2000-06-21 13:47  kato
+
+	* src/: config.h, define.h, endian_free.c, error.h, fileio.c,
+	imalloc.c, teo.h, teo_debug.c, teo_debug.h:
+	各ファイルにCVSのリビジョン番号を付加
+	Release-1.1.5
+
+2000-06-20 19:54  kato
+
+	* src/: Makefile, error.c, fileio.c, teo_debug.c, teo_debug.h:
+	デバックモードで TeoCloseFile(ptr),TeoFreeImage(ptr) の
+	ptr に NULL を 代入するように変更．
+
+2000-06-19 14:22  kato
+
+	* src/: Makefile, config.h, define.h, endian_free.c, error.c,
+	error.h, fileio.c, imalloc.c, teo-config.rb, teo.h, teo_debug.c,
+	teo_debug.h: update major version number
+	Release-1.1.4
+
+2000-06-19 14:07  kato
+
+	* CHANGES, COPYRIGHT, README, doc/FORMAT.txt, doc/Reference.txt:
+	update major version number
+
+1999-09-06  (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+    * PNM の画像をオープンするときに TEOFILE 構造体のメンバに初期化の
+      し忘れがあった．このため，TeoCloseFile のときにセグメンテーショ
+      ンフォルトになる可能性があった．
+      Release 1.1.3
+
+1998-08-01  (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+    *TeoError() やデバッグモードでのメッセージにエラーを生じたファイ
+      ル名と行番号が付くようにした.
+      Release 1.1.2
+
+1998-06-22 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+    ・TeoCloseFile() で, TEOFILE 構造体の extv を確保していない場合で
+      も free していたバグを修正(fileio.c)
+    ・デバックモードで 100MB の画像を作成したときに warning を出す部分
+      が 1MB になっていたバグを修正
+    ・signal catch の実装を変更
+    ・このバージョンから CVS(RCS)でバージョン管理を行っています.
+      Release 1.1.1
+
+1998-05-15 kato
+    ・ドキュメントの更新(向川)
+    ・一枚の画像に対する関数 TeoAllocImageFromFile(), TeoSaveImage() を削除
+      (libteoutil のほうに入れる予定)
+      Release 1.1
+
+1998-05-05 kato
+    ・各種デバッグモードの実装
+
+    Level 1
+       ・TeoGetPixel,TeoPutPixelの(x,y,p)の範囲が越えていれば警告
+       ・TeoGetPixel,TeoPutPixelするときに，TEOIMAGEが NULLであればエラー
+       ・TeoAllocImageしたときに，画像の幅や高さが負の値になっていれば警
+         告
+
+       ・TeoPutPixel,TeoGetPixel,TeoPutBit,TeoGetBit で, 指定した画素
+         の型と実際の画素の型のサイズが異っていれば警告
+    Level 2
+       ・TeoCloseFileした時に，最終フレームでないなら(WriteFrame忘れ)
+         であれば警告
+       ・TeoAllocImageしたときに，画像サイズが異常にでかい(100MB以上)とき警告
+       ・TeoOpenFile,TeoCreateFileで，ファイル名が *.teoで終っていなければ警告
+          (sprintfでファイル名を自動生成する時のバグを発見)
+    Level 3
+       ・その他すべての不審な挙動に警告を出す.
+
+      マクロ TEO_DEBUG_ERROR が定義されている場合は全ての警告をエラーと
+      して停止する.
+
+    ・一枚の画像に対する関数 TeoAllocImageFromFile(), TeoSaveImage() を追加
+
+    1.1-Beta2
+
+1998-04-23 kato
+    ・TeoError() メッセージの改善
+    ・デバッグモードの枠組を作った.
+    ・TeoOpenFile(), TeoCreateFile() をデバッグモード対応にした.
+    ・fopen() のモードを "r", "w", から "rb", "wb" に変更した.
+      (Windows & Mac のため)
+    ・teo_* の形式のマクロを Teo* に変更した.
+    1.1-Bata1 (Bata版は研究室内のみのテストリリース)
+
+1997-09-27 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・PnmWriteHeader で, Pnm に変換できる画素の型を TEO_UNSIGNED に決め
+     打ちしていたため, 1bit 画像で UNSIGNED でないものを変換できなくなっ
+     ていた Bug を直した.
+   ・src/Makefile の記述ミスを修正. スタティックライブラリとシェアード
+     ライブラリのオブジェクトを生成するときのオプションを独立にした.
+     Release-1.0.1
+
+1997-07-22 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・ヘッダのユーザ拡張を導入した。
+	TeoCreateFileWithUserExtension(),
+	TeoCreateNonGzFileWithUserExtension(),
+	TeoCreateGzFileWithUserExtension(),
+	TeoGetUserExtension()
+	を追加(teo.h,fileio.h)
+   ・TeoReadFrame(),TeoWriteFrame(),TeoSetAbsFrame(),TeoSetRelFrame()
+     で、アクセスしているフレーム番号の範囲をチェックするようにした。
+   ・メンバアクセス関数(マクロ)
+	teo_extc(),
+	teo_extv(),
+	teo_current(),
+	TeoIsBIT(),
+	TeoIsUINT8(),
+	TeoIsSINT8(),
+	TeoIsUINT16(),
+	TeoIsSINT16(),
+	TeoIsUINT32(),
+	TeoIsSINT32(),
+	TeoIsFLOAT32(),
+	TeoIsFLOAT64(),
+	TeoCheckFrame()
+	を追加(teo.h)
+   ・TeoFreadEndian(),TeoFwriteEndian() のオーバーヘッドを改善(endian_free.c)
+   ・異常終了したときに、テンポラリファイルを消すことができるようにし
+     た。
+   ・popen() を使って gzip を並列、実行できるようにした。
+   Release-1.0
+
+1997-06-20 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・画像の右端、下端を決めるマクロのバグを修正。
+   Release-0.4.2
+
+1997-06-13 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・二値画像のサイズの計算のバグを修正。
+   ・Reference.txt の typo を修正。
+   Release-0.4.1
+
+1997-06-08 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・Image データのカプセル化などを行ない、それにともなってインタフェ
+   イスを大幅に変更。
+   ・環境変数を参照して、圧縮をかけるかどうか決められるようした。
+   ・画像にオフセットを持たせることができる TEO Image Format Ver. 1 に
+   対応。
+   ・FORMAT.txt, Reference.txt を追加。
+   ・正式リリース beta テストバージョンとなる予定。
+   Release-0.4
+
+1997-05-30 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・GZIP 圧縮をサポート。しかしいくつかの問題があり、結局次の v0.4 に
+   吸収されて配布されることなく幻のバージョンとなってしまった。
+   Release-0.3
+
+1997-05-21 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ・TeoOpen で、マジックナンバーを読んで ungetc でもう一度押し込む部
+   分のバグを修正。
+   ・パッケージにサンプルプログラムとドキュメントを追加.
+	(Yasuhiro MUKAIGAWA <mukaigaw@chino.it.okayama-u.ac.jp>)
+    Release-0.2.1
+
+1997-05-20 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   ファイルオープン・クローズ、ヘッダの読み書きの抽象化、エラー処理関
+   数の実装
+   Release-0.2
+
+1997-05-20 (Takekazu KATO <kato@chino.it.okayama-u.ac.jp>)
+   低級ライブラリの実装(初期バージョン).
+   ・ヘッダの読み書き
+   ・データの読み書き
+   ・ファイルポインタのフレーム単位での移動
+   ・ 画素アクセス
+   についての最下層でのインタフェイスを実装した。
+   Release-0.1

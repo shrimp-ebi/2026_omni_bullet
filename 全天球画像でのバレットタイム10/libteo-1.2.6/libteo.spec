@@ -1,0 +1,73 @@
+%define prefix 		/usr/local
+%define pkgconfigdir	/usr/lib/pkgconfig
+
+Summary: Teo Image Library
+Summary(ja): TEO画像ライブラリ
+Name: libteo
+Version: 1.2.6
+Release: 1vl1
+Copyright: Takekazu KATO
+Distribution: Vine
+Vendor: Project Vine
+Group: Teo/Libraries
+Source0: libteo-%{version}.tar.gz
+Packager: Yasuyuki SUGAYA <sugaya@suri.it.okayama-u.ac.jp>
+BuildRoot: /var/tmp/libteo-root
+
+%description
+This packages includes TEO Image Library.
+
+%description -l ja
+このパッケージにはTEO(Tsukuba-Etl-Okayama)画像フォーマットVer1を
+Ｃ言語で簡単に扱うためのライブラリlibteoが入っています。
+
+%package devel
+Summary: Teo Image Library Development
+Summary(ja): TEO画像ライブラリのへッダファイル
+Group: Teo/Development
+
+%description devel
+This package contains development libraries against libteo.
+
+%description devel -l ja
+このパッケージには TEO を使用したアプリケーション開発用のヘッダ
+ファイルが入っています。
+
+%prep
+rm -rf $RPM_BUILD_ROOT
+
+%setup
+
+%build
+./configure --prefix=%{prefix} --with-pkgconfig-dir=%{pkgconfigdir}
+make
+
+%install
+
+make prefix=$RPM_BUILD_ROOT%{prefix} pkgconfig_dir=$RPM_BUILD_ROOT%{pkgconfigdir} install 
+
+%post
+if ! grep -q '^%{prefix}/lib$' /etc/ld.so.conf ; then
+    echo '%{prefix}/lib' >> /etc/ld.so.conf
+fi
+/sbin/ldconfig
+
+%postun
+if [ "$1" = "0" ] && grep -q '^%{prefix}/lib$' /etc/ld.so.conf ; then
+    grep -v '^%{prefix}/lib$' /etc/ld.so.conf >> /etc/ld.so.conf.new
+    mv -f /etc/ld.so.conf.new /etc/ld.so.conf
+fi
+/sbin/ldconfig
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+%{prefix}/lib/libteo.a
+%{prefix}/lib/libteo.so*
+
+%files devel
+%{prefix}/include/teo.h
+%{prefix}/include/teo_debug.h
+%{prefix}/lib/libteo.la
+%{pkgconfigdir}/teo.pc

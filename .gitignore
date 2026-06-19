@@ -1,3 +1,16 @@
 /05.13_video_frames/
 __pycache__/
 *.py[cod]
+
+# 動画
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# 画像
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif

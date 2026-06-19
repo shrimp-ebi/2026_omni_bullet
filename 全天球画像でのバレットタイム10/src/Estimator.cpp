@@ -158,7 +158,7 @@ namespace spherical_bullet_time{
 //        std::cout << R << std::endl;
 
         // LM法の定数を設定
-        double lambda = 0.0000001;
+        double lambda = 0.0001;
 
 //        cv::Mat kernel_x;  // x方向カーネル
 //        cv::Mat kernel_y;  // y方向カーネル
@@ -168,37 +168,12 @@ namespace spherical_bullet_time{
         cv::Mat diff_image_y;
         cv::Mat diff_image_z;
         make_differential_image(img_in, diff_image_x, diff_image_y, diff_image_z);
-//        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/diff_image_x.png", diff_image_x);
-//        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/diff_image_y.png", diff_image_y);
-//        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/diff_image_z.png", diff_image_z);  */
-/*        int ksize = 5;  // カーネルサイズ（5x5）
-        double sigma = 2;  // ガウシアンカーネルの標準偏差
-        cv::Mat blurred;
-        cv::GaussianBlur(img_in, blurred, cv::Size(ksize, ksize), sigma);
-        cv::Mat first_diff_image_x;
-        cv::Mat first_diff_image_y;
-	cv::Sobel(blurred, first_diff_image_x, CV_64F, 1, 0, 3); // x方向微分
-	cv::Sobel(blurred, first_diff_image_y, CV_64F, 0, 1, 3); // y方向微分*/
 
         int count=0;
         while(true) {
             // 基準画像Sbの点を回転させて、Srから似た見え方をする領域を探す。    
             
 //            cv::Mat rotated_img = rotate_comparison_range(img_in, R);
-            
-/*            //微分画像を切り取って生成
-            cv::Mat comp_diff_image_x = rotate_comparison_range2(diff_image_x, R);
-            cv::Mat comp_diff_image_y = rotate_comparison_range2(diff_image_y, R);
-            cv::Mat comp_diff_image_z = rotate_comparison_range2(diff_image_z, R);*/
-//            cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/diff_image_x.png", diff_image_x);
-//            cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/diff_image_y.png", diff_image_y);
-//            cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/diff_image_z.png", diff_image_z);
-//            cv::Mat smoothing_diff_image_x;
-//            cv::Mat smoothing_diff_image_y;
-//            cv::filter2D(rotated_img, smoothing_diff_image_x, CV_64F, kernel_x);
-//            cv::filter2D(rotated_img, smoothing_diff_image_y, CV_64F, kernel_y);
-//            cv::imwrite("diff_x.png", smoothing_diff_image_x);
-//            cv::imwrite("diff_y.png", smoothing_diff_image_y);
 //            cv::imwrite("./totyu/"+std::to_string(count)+".png", rotated_img);
 
             // 回転行列を微分した行列を生成
@@ -216,7 +191,7 @@ namespace spherical_bullet_time{
 /*            for(int y=0; y<base_clip.rows; ++y){
                 for(int x=0; x<base_clip.cols; ++x){*/
             cv::Vec2i xy_in;
-            cv::Vec2i xy_out;
+            cv::Vec2i xy_out;    
             int comp_start_x = (img_in.cols-comp_range_cartesian_.cols)/2;
             int comp_start_y = (img_in.rows-comp_range_cartesian_.rows)/2;
 //            std::cout << "comp_start_x,comp_start_y" << comp_start_x << "," << comp_start_y << std::endl;
@@ -230,6 +205,7 @@ namespace spherical_bullet_time{
                     double error = img_in.ptr<uint8_t>(xy_out[1])[xy_out[0]] - base_clip.ptr<uint8_t>(xy_in[1])[xy_in[0]];
                     sum_of_error += error*error;
 //                 std::cout << "xy_out: " << xy_out[0] << "," << xy_out[1] << std::endl;
+
                     // 回転前の三次元座標に各パラメータ微分の回転行列をかける
                     // つまり参照画像の座標系にR.tをかけたやつ
                     cv::Mat differential_1 = w1 * Sb.ptr<cv::Vec3d>(xy_in[1])[xy_in[0]];
@@ -264,7 +240,7 @@ namespace spherical_bullet_time{
             }
             grad /= num_of_clip_pixel_;
             hesse /= num_of_clip_pixel_;
-            sum_of_error /= 2*num_of_clip_pixel_;
+            sum_of_error /= num_of_clip_pixel_;
 //            std::cout << "grad : " << grad << std::endl;
 //            std::cout << "hesse : " << hesse << std::endl;
 
@@ -310,10 +286,11 @@ namespace spherical_bullet_time{
 
                 //更新後の回転行列で誤差を再計算
                 sum_of_error_new = 0;
-                for(xy_in[1]=comp_start_y; xy_in[1]<comp_start_y+comp_range_cartesian_.rows; xy_in[1]++){//中心付近だけ比較したいな
-                    for(xy_in[0]=comp_start_x; xy_in[0]<comp_start_x+comp_range_cartesian_.cols; xy_in[0]++){
+                cv::Vec2i xy_in_2;
+                for(xy_in_2[1]=comp_start_y; xy_in_2[1]<comp_start_y+comp_range_cartesian_.rows; xy_in_2[1]++){//中心付近だけ比較したいな
+                    for(xy_in_2[0]=comp_start_x; xy_in_2[0]<comp_start_x+comp_range_cartesian_.cols; xy_in_2[0]++){
                         // 描画範囲の3次元点を回転
-                        cv::Mat rotated = R_new * Sb.ptr<cv::Vec3d>(xy_in[1])[xy_in[0]];
+                        cv::Mat rotated = R_new * Sb.ptr<cv::Vec3d>(xy_in_2[1])[xy_in_2[0]];
 //                        std::cout << comp_range_cartesian_.ptr<cv::Vec3d>(y)[x] << std::endl;
 //                        std::cout << rotated << std::endl;
                         // 回転後の座標を極座標系に変換
@@ -322,7 +299,7 @@ namespace spherical_bullet_time{
                         cv::Vec2i uv_out = polar2SphericalImg(rotated_polar);
 
                         // 誤差計算
-                        double error = img_in.ptr<uint8_t>(uv_out[1])[uv_out[0]] - base_clip.ptr<uint8_t>(xy_in[1])[xy_in[0]];
+                        double error = img_in.ptr<uint8_t>(uv_out[1])[uv_out[0]] - base_clip.ptr<uint8_t>(xy_in_2[1])[xy_in_2[0]];
                         sum_of_error_new += error*error;
 
                         // 回転後画像の画素値を保存
@@ -331,13 +308,15 @@ namespace spherical_bullet_time{
                     }
                 }
 //                cv::imwrite("applied_new.png", rotated_img_new);
-                sum_of_error_new /= 2*num_of_clip_pixel_;
+                sum_of_error_new /= num_of_clip_pixel_;
 
                 //誤差値比較. 誤差が小さくなっていないか減少量が極端に少ない場合はやり直し
                 std::cout << "error : " << sum_of_error << std::endl;
                 std::cout << "new_error : " << sum_of_error_new << std::endl;
                 double diff = sum_of_error - sum_of_error_new;
 //                std::cout << "diff : " << abs(diff) << std::endl;
+		appendToCSV("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/data.csv", count, sum_of_error_new);
+		count++;
                 if (sum_of_error > sum_of_error_new || abs(diff) < 0.1) break;
                 lambda *= 10;
             }
@@ -346,6 +325,7 @@ namespace spherical_bullet_time{
             std::cout << "error : " << sum_of_error << std::endl;
             std::cout << "new error : " << sum_of_error_new << std::endl;
 //            cv::imwrite("./totyu/"+std::to_string(count)+".png", rotated_img);
+            appendToCSV("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/data.csv", count, sum_of_error_new);
             count++;
 
             //パラメータ更新
@@ -357,7 +337,7 @@ namespace spherical_bullet_time{
             std::cout << cv::norm(delta_w) << std::endl;
             if(cv::norm(delta_w) < 1.0e-5){
                 std::cout << "estimated R" << R << std::endl;
-//                appendToCSV("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/data2.csv", sum_of_error_new, cv::norm(delta_w));
+//                appendToCSV("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/data.csv", sum_of_error_new, cv::norm(delta_w));
                 return R;
             }
 
@@ -368,40 +348,31 @@ namespace spherical_bullet_time{
 
     //微分画像を計算する
     void Estimator::make_differential_image(const cv::Mat& img_in, cv::Mat& diff_image_x, cv::Mat& diff_image_y, cv::Mat& diff_image_z){
-        int ksize = 5;  // カーネルサイズ（5x5）
+        int ksize = 3;  // カーネルサイズ（5x5）
         double sigma = 2;  // ガウシアンカーネルの標準偏差
         cv::Mat blurred;
         cv::GaussianBlur(img_in, blurred, cv::Size(ksize, ksize), sigma);
-        cv::Mat first_diff_image_x;
-        cv::Mat first_diff_image_y;
-	cv::Sobel(blurred, first_diff_image_x, CV_64F, 1, 0, 5); // x方向微分
-	cv::Sobel(blurred, first_diff_image_y, CV_64F, 0, 1, 5); // y方向微分
-/*        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/blurred.png", blurred);
-	cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/first_diff_image_x.png", first_diff_image_x);        
-        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/first_diff_image_y.png", first_diff_image_y);*/
-//        cv::Mat kernel_x = cv::Mat::zeros(3, 3, CV_64F);  // x方向カーネル
-//        cv::Mat kernel_y = cv::Mat::zeros(3, 3, CV_64F);  // y方向カーネル
-//        kernel_x.ptr<double>(1)[1] = -1;
-//        kernel_x.ptr<double>(1)[2] = 1;
-//        kernel_y.ptr<double>(1)[1] = -1;
-//        kernel_y.ptr<double>(0)[1] = 1;
-//        cv::Mat kernel_x = (cv::Mat_<double>(3, 3) << -1, 0, 1, -1, 0, 1, -1, 0, 1);  // x方向カーネル
-//        cv::Mat kernel_y = (cv::Mat_<double>(3, 3) << -1, -1, -1, 0, 0, 0, 1, 1, 1);  // y方向カーネル
-/*        cv::Mat kernel_x;  // x方向カーネル
-        cv::Mat kernel_y;  // y方向カーネル
-        create_smoothing_diff_kernel(kernel_x, kernel_y, 5, 2);
-
-//        std::cout << "kernel_x" << kernel_x << std::endl;
-//        std::cout << "kernel_y" << kernel_y << std::endl;
-        cv::Mat first_diff_image_x;
-        cv::Mat first_diff_image_y;
-        cv::filter2D(img_in, first_diff_image_x, CV_64F, kernel_x);
-        cv::filter2D(img_in, first_diff_image_y, CV_64F, kernel_y);*/
-       
+        blurred.convertTo(blurred, CV_64F);
         diff_image_x = cv::Mat(img_in.rows, img_in.cols, CV_64F);
         diff_image_y = cv::Mat(img_in.rows, img_in.cols, CV_64F);
         diff_image_z = cv::Mat(img_in.rows, img_in.cols, CV_64F);
-        cv::Vec2i uv_in;
+        
+/*        cv::Vec2i uv_in(0,0);
+        cv::Vec2i uv_in_theta(1,0);
+        cv::Vec2i uv_in_phi(0,1);
+        
+        auto polar = sphericalImg2polar(uv_in, img_in.size());
+        auto polar_theta = sphericalImg2polar(uv_in_theta, img_in.size());
+        auto polar_phi = sphericalImg2polar(uv_in_phi, img_in.size());
+        std::cout << "polar_theta: " << polar_theta << std::endl;
+        std::cout << "polar_phi: " << polar_phi << std::endl;
+                  
+        double par_d_theta = polar_theta[0]-polar[0]; //∂θを計算
+        double par_d_phi = polar_phi[1]-polar[1]; //∂φを計算
+        std::cout << "par_d_theta, par_d_phi: " << par_d_theta << "," << par_d_phi << std::endl;*/
+        
+        cv::Vec2i uv_in;   
+        
         for(uv_in[1]=0; uv_in[1]<img_in.rows; uv_in[1]++){
             for(uv_in[0]=0; uv_in[0]<img_in.cols; uv_in[0]++){
                 auto polar = sphericalImg2polar(uv_in, img_in.size());
@@ -409,19 +380,23 @@ namespace spherical_bullet_time{
                 double s_phi = std::sin(polar[1]);
                 double c_theta = std::cos(polar[0]);
                 double c_phi = std::cos(polar[1]);
-                double diffS_theta = first_diff_image_x.ptr<double>(uv_in[1])[uv_in[0]];
-                double diffS_phi = first_diff_image_y.ptr<double>(uv_in[1])[uv_in[0]];
                 
-                if(std::abs(s_phi)<=1.0e-5){
-                    diff_image_x.ptr<double>(uv_in[1])[uv_in[0]] = 0;
-                }else{
-                    diff_image_x.ptr<double>(uv_in[1])[uv_in[0]] = (-diffS_theta*s_theta/s_phi)+(diffS_phi*c_theta/s_phi);
-                }
+                double par_d_theta = sphericalImg2polar(cv::Vec2i((uv_in[0] + 1) % img_in.cols, uv_in[1]), img_in.size())[0] - sphericalImg2polar(cv::Vec2i((uv_in[0] - 1 + img_in.cols) % img_in.cols, uv_in[1]), img_in.size())[0];
+                double par_d_phi = sphericalImg2polar(cv::Vec2i(uv_in[0], (uv_in[1] + 1) % img_in.rows), img_in.size())[1] - sphericalImg2polar(cv::Vec2i(uv_in[0], (uv_in[1] - 1 + img_in.rows) % img_in.rows), img_in.size())[1];
+//                double par_d_theta = sphericalImg2polar(cv::Vec2i((uv_in[0] + 1) % img_in.cols, uv_in[1]), img_in.size())[0] - polar[0];
+//                double par_d_phi = sphericalImg2polar(cv::Vec2i(uv_in[0], (uv_in[1] - 1 + img_in.rows) % img_in.rows), img_in.size())[1] - polar[1];
+
+                double par_d_S_theta = blurred.ptr<double>(uv_in[1])[(uv_in[0] + 1) % img_in.cols]-blurred.ptr<double>(uv_in[1])[(uv_in[0] - 1 + img_in.cols) % img_in.cols]; //∂Sを計算
+                double par_d_S_phi = blurred.ptr<double>((uv_in[1] + 1) % img_in.rows)[uv_in[0]]-blurred.ptr<double>((uv_in[1] - 1 + img_in.rows) % img_in.rows)[uv_in[0]];         
+//                double par_d_S_theta = blurred.ptr<double>(uv_in[1])[(uv_in[0] + 1) % img_in.cols]-blurred.ptr<double>(uv_in[1])[uv_in[0]]; //∂Sを計算
+//                double par_d_S_phi = blurred.ptr<double>((uv_in[1] - 1 + img_in.rows) % img_in.rows)[uv_in[0]]-blurred.ptr<double>(uv_in[1])[uv_in[0]];
+//                std::cout << "par_d_S_theta, par_d_S_phi: " << par_d_S_theta << "," << par_d_S_phi << std::endl;        
+                    
+                double diffS_theta = par_d_S_theta/par_d_theta; //∂S/∂θを計算
+                double diffS_phi = par_d_S_phi/par_d_phi; //∂S/∂φを計算
+//                std::cout << "diffS_theta, diffS_phi: " << diffS_theta << "," << diffS_phi << std::endl;
                 
-                diff_image_y.ptr<double>(uv_in[1])[uv_in[0]] = (diffS_theta*c_phi*c_theta)+(diffS_phi*c_phi*s_theta);
-                diff_image_z.ptr<double>(uv_in[1])[uv_in[0]] = (diffS_theta*s_phi*c_theta)+(diffS_phi*s_phi*s_theta);
-                
-/*                if(std::abs(s_phi)<=1.0e-16){
+                if(std::abs(s_phi)<=1.0e-10){
                     diff_image_x.ptr<double>(uv_in[1])[uv_in[0]] = 0;
                     diff_image_y.ptr<double>(uv_in[1])[uv_in[0]] = 0;
                 }else{
@@ -429,11 +404,20 @@ namespace spherical_bullet_time{
                     diff_image_y.ptr<double>(uv_in[1])[uv_in[0]] = (diffS_theta*c_theta/s_phi)+(diffS_phi*c_phi*s_theta);
                 }
                 
-                diff_image_z.ptr<double>(uv_in[1])[uv_in[0]] = (diffS_theta*0)+(-diffS_phi*s_phi);*/            
-            }    
+                diff_image_z.ptr<double>(uv_in[1])[uv_in[0]] = (diffS_theta*0)+(-diffS_phi*s_phi);
+            }
         }
+        
+        
+        cv::Mat output_x, output_y, output_z;
+        diff_image_x.convertTo(output_x, CV_8U, 255.0); // スケール変換
+        diff_image_y.convertTo(output_y, CV_8U, 255.0);
+        diff_image_z.convertTo(output_z, CV_8U, 255.0);
+        
+//        cv::imwrite("/home/h233304/全天球画像でのバレットタイム11/cmake-build-debug/猫/diff_image_x.png", output_x);
+//        cv::imwrite("/home/h233304/全天球画像でのバレットタイム11/cmake-build-debug/猫/diff_image_y.png", output_y);
+//        cv::imwrite("/home/h233304/全天球画像でのバレットタイム11/cmake-build-debug/猫/diff_image_z.png", output_z);
     }
-
 
     // 画像座標系から極座標系に変換する
     cv::Vec2d Estimator::sphericalImg2polar(const cv::Vec2i& uv) const{
@@ -598,27 +582,18 @@ namespace spherical_bullet_time{
         return rotated_img;
     }
     
-    cv::Mat Estimator::rotate_comparison_range2(const cv::Mat& img_in, const cv::Mat& R) const{
+    cv::Mat Estimator::rotate_comparison_range2(const cv::Mat& img_in) const{
         // 回転後の画像を生成
 //        cv::Mat R_ = cv::Mat::eye(3, 3, CV_64F);
-        cv::Mat rotated_img = cv::Mat(comp_range_cartesian_.size(), CV_64F);
-        for (int i = 0; i < rotated_img.rows; ++i) {
-            for (int j = 0; j < rotated_img.cols; ++j) {
-                // カメラの向きを回転
-                cv::Mat rotated = R * comp_range_cartesian_.ptr<cv::Vec3d>(i)[j];
-//                cv::Mat rotated = R_ * comp_range_cartesian_.ptr<cv::Vec3d>(i)[j];
-//                std::cout << comp_range_cartesian_.ptr<cv::Vec3d>(i)[j] << std::endl;
-//                std::cout << cartesian2Polar(comp_range_cartesian_.ptr<cv::Vec3d>(i)[j]) << std::endl;
-
-                // 回転後の座標を極座標系に変換
-                auto rotated_polar = cartesian2Polar(rotated);
-//                std::cout << rotated_polar << std::endl;
-                // 極座標系を画像座標系に変換
-                cv::Vec2i uv_out = polar2SphericalImg(rotated_polar);
-
-                // 回転後画像の画素値を保存
-//                std::cout << uv_out[1] << "," << uv_out[0] << std::endl;
-                rotated_img.ptr<double>(i)[j] = img_in.ptr<double>(uv_out[1])[uv_out[0]];
+            cv::Mat rotated_img = cv::Mat(comp_range_cartesian_.size(), CV_8U);
+            cv::Vec2i xy_in; 
+            int comp_start_x = (img_in.cols-comp_range_cartesian_.cols)/2;
+            int comp_start_y = (img_in.rows-comp_range_cartesian_.rows)/2;
+//            std::cout << "comp_start_x,comp_start_y" << comp_start_x << "," << comp_start_y << std::endl;
+            for(xy_in[1]=comp_start_y; xy_in[1]<comp_start_y+comp_range_cartesian_.rows; xy_in[1]++){//中心付近だけ比較したいな
+                for(xy_in[0]=comp_start_x; xy_in[0]<comp_start_x+comp_range_cartesian_.cols; xy_in[0]++){
+                // 画像の画素値を保存
+                rotated_img.ptr<uint8_t>(xy_in[1]-comp_start_y)[xy_in[0]-comp_start_x] = img_in.ptr<uint8_t>(xy_in[1])[xy_in[0]];
             }
         }
 

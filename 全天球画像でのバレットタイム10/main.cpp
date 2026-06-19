@@ -137,32 +137,37 @@ void reverse2(const std::string& filename)
 void draw_gaze_line(){
     int count = 0;
     while(true){
-        cv::Mat img_in_color = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/test/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
+        cv::Mat img_in_color = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/target5/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
         if(img_in_color.empty()){
             std::cout << count << std::endl;
             std::cout << "おわり" << std::endl;
             return;
         }
-        int rows = 380;
-        int cols = 760;
+
+        int rows = 360;
+        int cols = 720;
+//        int rows = 480;
+//        int cols = 960;
+//        int rows = 380;
+//        int cols = 760;
 //        int rows = 3040;
 //        int cols = 6080;
         
 
         cv::line(img_in_color,cv::Point(0,rows/2), cv::Point(cols-1, rows/2), cv::Scalar(0,255,0),2);
         cv::line(img_in_color,cv::Point(cols/2,0), cv::Point(cols/2, rows-1), cv::Scalar(0,255,0),2);
-        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/猫/test/line_"+std::to_string(count)+".png", img_in_color);
+        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/target5_line/"+std::to_string(count)+".png", img_in_color);
         count += 1;
     }
 }
 
 void create_GIF()
 {
-    cv::VideoWriter writer("時計_GIF.mp4", cv::VideoWriter::fourcc('M','P','4','V'), 30, cv::Size(720,360),1);
+    cv::VideoWriter writer("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/target4_line/自販機2.mp4", cv::VideoWriter::fourcc('M','P','4','V'), 30, cv::Size(720,360),1);
     int count = 0;
 
     while(true) {
-        cv::Mat img_in_color = cv::imread("./時計/with_line/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
+        cv::Mat img_in_color = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/自販機2/target4_line/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
         if (img_in_color.empty()) {
             std::cout << count << std::endl;
             std::cout << "おわり" << std::endl;
@@ -177,7 +182,7 @@ void create_GIF()
 int main()
 {
     // mp4ファイルを画像にばらす
-//    expand_mp4("自動販売機3");
+//    expand_mp4("外3");
 //    return 0;
    // 画像に注視点を示す線を引く
 //    draw_gaze_line();
@@ -185,7 +190,7 @@ int main()
 //    create_GIF();
 //    return 0;
 
-    std::string filename = "猫";
+    std::string filename = "研究室2";
     std::string homename = "/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/";
     int fps = 1;
     double focus = 1;
@@ -211,13 +216,14 @@ int main()
     cv::Mat R;
     cv::Mat target_img;
     cv::Mat output_img;
+    cv::Mat match_img;
 
-    while(count<=10) {
+    while(count<=1) {
         std::chrono::system_clock::time_point  rap_start = std::chrono::system_clock::now();
 
         // 入力画像を読み込む
-        cv::Mat img_in = cv::imread(homename + filename + "/left/" + std::to_string(count) + ".png", cv::IMREAD_GRAYSCALE);
-        cv::Mat img_in_color = cv::imread(homename + filename + "/left/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
+        cv::Mat img_in = cv::imread(homename + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_GRAYSCALE);
+        cv::Mat img_in_color = cv::imread(homename + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
 //        cv::Mat img_in = cv::imread("./rev_" + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_GRAYSCALE);
 //        cv::Mat img_in_color = cv::imread("./rev_" + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
         if(img_in.empty()){
@@ -236,18 +242,7 @@ int main()
             estimator = std::make_unique<Estimator>(img_in.size(), comparison_range, clip_size, focus);
 
             // 1枚目の画像の中から注視点を選択し透視投影画像を生成
-//            cv::Point2i gaze(2584, 1291);  // 研究室本棚
-//            cv::Point2i ref(2878, 1282);  // 研究室本棚
-//            cv::Point2i gaze(3704, 1609);  // 研究室内電子レンジ用
-//            cv::Point2i ref(3792, 1610);  // 研究室内電子レンジ用
-//            cv::Point2i gaze(140, 1356);  // object
-//            cv::Point2i ref(152, 1355);  // object
-//            cv::Point2i gaze(5537, 1474);  // object_100
-//            cv::Point2i ref(5555, 1478);  // object_100
-//            cv::Point2i gaze(5716, 1325);  // 時計
-//            cv::Point2i ref(5726, 1324);  // 時計
-//            cv::Point2i gaze(389, 1335);  // 時計_90
-//            cv::Point2i ref(403, 1335);  // 時計_90
+
 //            cv::Point2i gaze(25, 1580);  // 自販機
 //            cv::Point2i ref(36, 1584);  // 自販機
 //            cv::Point2i gaze(2924, 1486);  // 自販機_rev
@@ -264,19 +259,37 @@ int main()
 //            cv::Point2i ref(2992, 1420);  // 自販機2_40
 //            cv::Point2i gaze(2774, 1364);  // 自販機3_100
 //            cv::Point2i ref(2848, 1359);  // 自販機3_100
-//            cv::Point2i gaze(3108, 1508);  // 掲示板
-//            cv::Point2i ref(3208, 1508);  // 掲示板
+
 //            cv::Point2i gaze(2817 ,1930);  // 猫(cat1左耳)
 //           cv::Point2i ref(2999 ,1881);  // 猫(cat1右耳)
-            cv::Point2i gaze(3040 ,1520);  // 猫(中心cat1左耳)
-            cv::Point2i ref(3213 ,1520);  // 猫(中心cat1右耳)            
+//            cv::Point2i gaze(3040 ,1520);  // 猫(中心cat1左耳)
+//            cv::Point2i ref(3213 ,1520);  // 猫(中心cat1右耳)       
+//            cv::Point2i gaze(1330 ,665);  // 研究室
+//            cv::Point2i ref(1440 ,671);  // 研究室 
+//            cv::Point2i gaze(2660 ,1334);  // 研究室2
+//            cv::Point2i ref(2888 ,1347);  // 研究室 2
+//            cv::Point2i gaze(2542 ,1351);  // 外
+//            cv::Point2i ref(2681 ,1359);  // 外
+//            cv::Point2i gaze(2752 ,1444);  // 自販機
+//            cv::Point2i ref(3019 ,1445);  // 自販機
+//            cv::Point2i gaze(2478 ,1507);  // 自販機2
+//            cv::Point2i ref(2782 ,1494);  // 自販機2
+            cv::Point2i gaze(2744 ,1347);  // 研究室2
+            cv::Point2i ref(2918 ,1363);  // 研究室2
+//            cv::Point2i gaze(2711 ,1545);  // 外2
+//            cv::Point2i ref(2964 ,1532);  // 外2
+//            cv::Point2i gaze(2774 ,1418);  // 外3
+//            cv::Point2i ref(2981 ,1418);  // 外3
+
             R = calc_R_by2p(gaze, ref, img_in.size());  // 注視点と参照点から回転行列を計算
 //            std::cout << "R_init" << R << std::endl;
             // 計算した回転行列で最初のフレームだけ計算
             target_img = estimator->rotate_img2(img_in, R, img_in.size());
-            cv::imwrite(homename + filename + "/initial_clip.png", target_img);
+            match_img = estimator->rotate_comparison_range2(target_img);
+//            cv::imwrite(homename + filename + "/target_img.png", target_img);
+            cv::imwrite(homename + filename + "/target5/" + "/initial_clip.png", match_img);
             output_img = estimator->rotate_clip(img_in_color, R);
-            cv::imwrite(homename + filename + "/test/" + std::to_string(count) + ".png", output_img);
+            cv::imwrite(homename + filename + "/target5/" + std::to_string(count) + ".png", output_img);
             count+=fps;
             continue;
         }
@@ -299,9 +312,9 @@ int main()
         R = estimator->estimate_R(img_in, target_img, R);
 
         // 結果を出力する
-//        target_img = estimator->rotate_img2(img_in, R, img_in.size());
+        target_img = estimator->rotate_img2(img_in, R, img_in.size());
         output_img = estimator->rotate_clip(img_in_color, R);
-        cv::imwrite(homename + filename + "/test/" + std::to_string(count) + ".png", output_img);
+        cv::imwrite(homename + filename + "/target5/" + std::to_string(count) + ".png", output_img);
         count += fps;
 
         // 画像一枚にかかる時間を計測

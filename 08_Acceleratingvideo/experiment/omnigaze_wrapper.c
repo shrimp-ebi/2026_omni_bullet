@@ -27,8 +27,12 @@ int lm_estimate_frame_file(const char *base_path, const char *ref_path,
 
     int W = base->width;
     int H = base->height;
-    int u_min = W / 4,  u_max = 3 * W / 4;
-    int v_min = H / 4,  v_max = 3 * H / 4;
+    /* Use a narrow window around the image center (720x360 pixels) to
+     * focus matching around the gaze point and avoid flat regions that
+     * make the objective function too smooth. This replaces the previous
+     * half-centered area (W/4..3W/4, H/4..3H/4). */
+    int u_min = W / 2 - 360,  u_max = W / 2 + 360;
+    int v_min = H / 2 - 180,  v_max = H / 2 + 180;
 
     Matrix3x3 R = R_init_mat;
     double C = 0.0001;

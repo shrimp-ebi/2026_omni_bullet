@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+teo_binary_version=@VERSION@
+
+Name: TEO
+Description: TEO Image Library
+Version: @VERSION@
+Libs: -L${libdir} -lteo
+Cflags: -I${includedir}
+

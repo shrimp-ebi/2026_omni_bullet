@@ -1,0 +1,71 @@
+------------------------------------------------------------------------
+ TEO Image Library Version 1.2
+
+ author: Takekazu KATO <t.kato@aist.go.jp>
+------------------------------------------------------------------------
+
+	 TEO 画像フォーマットを C で扱うためのライブラリです。
+
+○ インストール
+
+パッケージを展開し、
+
+         % sh configure
+	 % make
+	 % make install
+
+として下さい。詳しくはINSTALLを参照してください。
+
+○ ファイル
+COPYING, COPYING.ja
+	TEO ライブラリの CopyRight です。
+
+ChangeLog
+	TEO ライブラリの遍歴
+
+README
+	このファイル
+
+INSTALL
+        インストールマニュアル
+
+src/	ライブラリのソース
+	define.h
+		各種オプションの定義
+	teo.h
+		ヘッダファイル、新しい型や、関数の型、マクロを定義しています
+	teo_debug.h
+		デバッグモード用ヘッダファイル
+	error.h
+		エラーメッセージの定義。
+	error.c
+		エラー処理関数(…と、いうほどでもないか)
+	endian_free.c
+		マシン毎のバイトオーダーの違いを吸収するファイル入出力関数
+	fileio.c
+		TEO フォーマットのヘッダアクセスのための関数。
+	imalloc.c
+		TEOIMAGE 型の alloc と free のための関数.
+	teo_debug.c
+		デバッグモード用の関数
+
+doc/	ドキュメント
+
+	FORMAT.txt
+		TEO画像フォーマットについての解説
+	Reference.txt
+		ライブラリのリファレンスマニュアル
+
+macros/ M4マクロ
+
+	teo.m4
+		libteo を使うアプリケーション用のM4マクロ
+
+
+○ ライセンス
+
+	本ライブラリの配布条件は改訂版 BSD style License
+        (伝統的なBSD style Licenseからバークレイの宣伝を求める条件を除い
+        たもの，FreeBSDで採用されているものと同じ)に従います。詳しくは 
+        COPYING, OPYING.ja を御覧ください。
+

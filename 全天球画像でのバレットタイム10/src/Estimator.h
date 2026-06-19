@@ -53,8 +53,8 @@ namespace spherical_bullet_time{
         // 全天球画像を回転させて中心部分のみを切り出す
         [[nodiscard]] cv::Mat rotate_comparison_range(const cv::Mat& img_in, const cv::Mat& R) const;
 
-        // 全天球画像を回転させて中心部分のみを切り出す2
-        [[nodiscard]] cv::Mat rotate_comparison_range2(const cv::Mat& img_in, const cv::Mat& R) const;
+        // 全天球画像の中心部分のみを切り出す
+        [[nodiscard]] cv::Mat rotate_comparison_range2(const cv::Mat& img_in) const;
 
         // 全天球画像を回転させて指定されたサイズのバレットタイム画像を切り出す
         [[nodiscard]] cv::Mat rotate_clip(const cv::Mat& img_in, const cv::Mat& R) const;
