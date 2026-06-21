@@ -1,54 +1,84 @@
-#include <iostream>
-#include <cmath>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+
 #include <opencv2/opencv.hpp>
 
 #include <Estimator.h>
 
-
 using namespace spherical_bullet_time;
+namespace fs = std::filesystem;
 
-void expand_mp4(const std::string& filename){
-    // mp4形式の全天球動画読み込み
-    cv::VideoCapture cap("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/" + filename + ".mp4");
-    if(!cap.isOpened()){
-        std::cout << "動画ファイルが開けません" << std::endl;
-    }
+namespace {
+// このサンプルプログラムの基準ディレクトリ。
+// 引数なしで起動した場合は、この下にある input.mp4 を読み込む。
+const fs::path kProjectDir =
+        "/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10";
 
-    std::cout << "width : " << (int)cap.get(cv::CAP_PROP_FRAME_WIDTH) << std::endl;
-    std::cout << "height : " << (int)cap.get(cv::CAP_PROP_FRAME_HEIGHT) << std::endl;
-    std::cout << "fps : " << cap.get(cv::CAP_PROP_FPS) << std::endl;
+// 実行ごとの出力フォルダ名に付ける時刻文字列を作る。
+// 例: input_20260619_164351
+std::string timestamp()
+{
+    const auto now = std::chrono::system_clock::now();
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    std::tm tm{};
+    localtime_r(&time, &tm);
 
-    cv::Mat frame;
-    int count = 0;
-    while(true){
-        cap.read(frame);
-        if(frame.empty()){
-            std::cout << "動画末尾到達" << std::endl;
-            return;
-        }
-        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/" + filename +"/" + std::to_string(count) + ".png", frame);
-        count++;
-    }
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y%m%d_%H%M%S");
+    return oss.str();
 }
 
+fs::path make_run_dir(const fs::path& input_video)
+{
+    // frames: 入力動画から取り出した元フレーム
+    // processed_frames: バレットタイム視点へ変換した出力フレーム
+    const fs::path run_dir = kProjectDir / "runs" /
+            (input_video.stem().string() + "_" + timestamp());
+    fs::create_directories(run_dir / "frames");
+    fs::create_directories(run_dir / "processed_frames");
+    return run_dir;
+}
 
-cv::Mat calc_R_by2p(const cv::Vec2d& gaze, const cv::Vec2d& ref){
-    // 注視点と参照点の3次元座標を計算
+fs::path resolve_input_video(int argc, char** argv)
+{
+    // コマンドライン引数があればそれを入力動画として使う。
+    // 相対パスの場合は kProjectDir からの相対パスとして扱う。
+    if(argc >= 2) {
+        fs::path input = argv[1];
+        if(input.is_relative()) {
+            input = kProjectDir / input;
+        }
+        return input;
+    }
+    return kProjectDir / "input.mp4";
+}
+}
+
+// 注視点と参照点の極座標から回転行列を計算する。
+// 注視点を新しいX軸、参照点を上下方向を決める手掛かりとして使い、
+// 「見たい方向が正面に来る」カメラ姿勢を作る。
+cv::Mat calc_R_by2p(const cv::Vec2d& gaze, const cv::Vec2d& ref)
+{
+    // 極座標系を直交座標系に変換
     auto gaze_3d = Estimator::polar2Cartesian(gaze);
     auto ref_3d = Estimator::polar2Cartesian(ref);
-//    std::cout << "gaze_3d" << gaze_3d << std::endl;
-//    std::cout << "ref_3d" << ref_3d << std::endl;
 
-    // 回転後の座標軸を計算
+    // 直交座標系の構成：
+    // X軸 = 注視方向
+    // Z軸 = X軸と参照方向の外積（垂直方向）
+    // Y軸 = Z軸とX軸の外積（右手系を構成）
     cv::Vec3d x = gaze_3d;
     cv::Vec3d z = gaze_3d.cross(ref_3d);
-    z /= cv::norm(z);
+    z /= cv::norm(z);  // 正規化
     cv::Vec3d y = z.cross(x);
 
-    //回転行列Rにまとめる
+    // 回転行列を構成（各列が基底ベクトル）
     cv::Mat R(3, 3, CV_64F);
-
     cv::Mat(3, 1, CV_64F, x.val).copyTo(R.col(0));
     cv::Mat(3, 1, CV_64F, y.val).copyTo(R.col(1));
     cv::Mat(3, 1, CV_64F, z.val).copyTo(R.col(2));
@@ -56,269 +86,165 @@ cv::Mat calc_R_by2p(const cv::Vec2d& gaze, const cv::Vec2d& ref){
     return R;
 }
 
-cv::Mat calc_R_by2p(const cv::Point2i& gaze, const cv::Point2i& ref, cv::Size size){
-    // 画像座標系を極座標系に変換
+// オーバーロード版：画像座標を極座標に変換してから回転行列を計算
+cv::Mat calc_R_by2p(const cv::Point2i& gaze, const cv::Point2i& ref, cv::Size size)
+{
+    // 画像座標を球面座標系の極座標に変換
     cv::Vec2d gaze_polar = Estimator::sphericalImg2polar(gaze, size);
     cv::Vec2d ref_polar = Estimator::sphericalImg2polar(ref, size);
-//    std::cout << "gaze_polar" << gaze_polar << std::endl;
-//    std::cout << "ref_polar" << ref_polar << std::endl;
-
-//    gaze_polar = cv::Vec2d(0, M_PI_2);
-//    ref_polar = cv::Vec2d(M_PI_4, M_PI_2);
-
     return calc_R_by2p(gaze_polar, ref_polar);
 }
 
-void reverse(const std::string& filename)
+int main(int argc, char** argv)
 {
-    int count = 0;
-    while(true){
-        // 入力画像を読み込む
-        cv::Mat img_in = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/" + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
-        if(count == 300){
-            return;
-        }
-
-        // 後ろを向くような回転行列
-        cv::Mat reverse_R = cv::Mat::zeros(3,3, CV_64F);
-        reverse_R.ptr<double>(0)[0] = -1;
-        reverse_R.ptr<double>(1)[1] = -1;
-        reverse_R.ptr<double>(2)[2] = 1;
-
-        cv::Mat reversed = Estimator::rotate_img(img_in, reverse_R, img_in.size());
-        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/" + filename + std::to_string(count) + ".png", reversed);
-        count+=30;
+    // ============================================
+    // 入力動画の設定・初期化
+    // ============================================
+    const fs::path input_video = resolve_input_video(argc, argv);
+    cv::VideoCapture cap(input_video.string());
+    if(!cap.isOpened()) {
+        std::cerr << "動画ファイルが開けません: " << input_video << std::endl;
+        return 1;
     }
-}
 
-void reverse2(const std::string& filename)
-{
-    int count = -10;
-    while(true){
-        // 入力画像を読み込む
-        cv::Mat img_in = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/" + filename + "/0.png", cv::IMREAD_COLOR);
-        if(count == 10){
-            return;
-        }
+    // 出力ディレクトリの作成
+    const fs::path run_dir = make_run_dir(input_video);
+    const fs::path frames_dir = run_dir / "frames";
+    const fs::path processed_dir = run_dir / "processed_frames";
+    const fs::path debug_dir = run_dir / "debug";
+    const fs::path csv_path = run_dir / "data.csv";
+    const fs::path movie_path = run_dir / "processed.mp4";
+    fs::create_directories(debug_dir);
 
-        // 真横を向く回転行列
-       double angle_degrees = count; // 数度だけ右を向く
-       double theta = angle_degrees * M_PI / 180.0; // ラジアンに変換
+    // 環境変数の設定（Estimatorクラスで使用）。
+    // Estimator 側は出力先を直接知らないため、CSVとデバッグ画像の保存先だけここから渡す。
+    setenv("SPHERICAL_BT_CSV_PATH", csv_path.string().c_str(), 1);
+    setenv("SPHERICAL_BT_DEBUG_DIR", debug_dir.string().c_str(), 1);
 
-       // 回転行列を生成
-       cv::Mat z_R = cv::Mat::eye(3, 3, CV_64F); // 単位行列で初期化
+    // 出力FPSの設定
+    const double input_fps = cap.get(cv::CAP_PROP_FPS);
+    const double output_fps = input_fps > 0.0 ? input_fps : 30.0;
 
-       //Z軸
-/*       z_R.at<double>(0, 0) = cos(theta);
-       z_R.at<double>(0, 1) = sin(theta);
-       z_R.at<double>(1, 0) = -sin(theta);
-       z_R.at<double>(1, 1) = cos(theta);*/
-       
-       //y軸
-/*       z_R.at<double>(0, 0) = cos(theta);
-       z_R.at<double>(0, 2) = sin(theta);
-       z_R.at<double>(2, 0) = -sin(theta);
-       z_R.at<double>(2, 2) = cos(theta);*/
-       
-       //x軸
-       z_R.at<double>(1, 1) = cos(theta);
-       z_R.at<double>(1, 2) = sin(theta);
-       z_R.at<double>(2, 1) = -sin(theta);
-       z_R.at<double>(2, 2) = cos(theta);
+    // 入力動画の情報を表示
+    std::cout << "input: " << input_video << std::endl;
+    std::cout << "run_dir: " << run_dir << std::endl;
+    std::cout << "width: " << static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH)) << std::endl;
+    std::cout << "height: " << static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT)) << std::endl;
+    std::cout << "fps: " << output_fps << std::endl;
 
-        cv::Mat reversed = Estimator::rotate_img(img_in, z_R, img_in.size());
-        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/" + filename + "/roll/" + std::to_string(count) + ".png", reversed);
-        std::cout << count << "枚目" << std::endl;   
-        count+=1;
-     
-    }
-}
+    // ============================================
+    // バレットタイム処理のパラメータ設定
+    // ============================================
+    const double focus = 1;              // 仮想透視カメラの焦点距離。値が大きいほど画角が狭くなる。
+    const double div = 8;                // 出力クリップの大きさ。元画像の幅・高さをこの値で割る。
+    const double div_ = 2;               // 推定に使う比較範囲。出力クリップよりさらに小さくする。
+    const int count_init = 0;            // 初期姿勢を手で与えるフレーム番号。
 
-void draw_gaze_line(){
-    int count = 0;
-    while(true){
-        cv::Mat img_in_color = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/target5/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
-        if(img_in_color.empty()){
-            std::cout << count << std::endl;
-            std::cout << "おわり" << std::endl;
-            return;
-        }
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
-        int rows = 360;
-        int cols = 720;
-//        int rows = 480;
-//        int cols = 960;
-//        int rows = 380;
-//        int cols = 760;
-//        int rows = 3040;
-//        int cols = 6080;
-        
-
-        cv::line(img_in_color,cv::Point(0,rows/2), cv::Point(cols-1, rows/2), cv::Scalar(0,255,0),2);
-        cv::line(img_in_color,cv::Point(cols/2,0), cv::Point(cols/2, rows-1), cv::Scalar(0,255,0),2);
-        cv::imwrite("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/target5_line/"+std::to_string(count)+".png", img_in_color);
-        count += 1;
-    }
-}
-
-void create_GIF()
-{
-    cv::VideoWriter writer("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/研究室2/target4_line/自販機2.mp4", cv::VideoWriter::fourcc('M','P','4','V'), 30, cv::Size(720,360),1);
-    int count = 0;
-
-    while(true) {
-        cv::Mat img_in_color = cv::imread("/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/自販機2/target4_line/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
-        if (img_in_color.empty()) {
-            std::cout << count << std::endl;
-            std::cout << "おわり" << std::endl;
-            return;
-        }
-        writer << img_in_color;
-        count += 1;
-    }
-}
-
-
-int main()
-{
-    // mp4ファイルを画像にばらす
-//    expand_mp4("外3");
-//    return 0;
-   // 画像に注視点を示す線を引く
-//    draw_gaze_line();
-//    return 0;
-//    create_GIF();
-//    return 0;
-
-    std::string filename = "研究室2";
-    std::string homename = "/home/h233304/全天球画像でのバレットタイム10/cmake-build-debug/";
-    int fps = 1;
-    double focus = 1;
-    double div = 8;
-    double div_ = 2;
-    int count_init = 0;
-    int count = count_init;
-
-    // 画像をひっくり返す
-//    reverse(filename);
-//    return 0;
-
-    // 画像を回転させる
-//    reverse2(filename);
-//    return 0;
-
-    // 処理時間計測開始
-    std::chrono::system_clock::time_point  start = std::chrono::system_clock::now();
-
+    // 処理に使用する変数の初期化
     cv::Size clip_size;
     cv::Size comparison_range;
     std::unique_ptr<Estimator> estimator;
-    cv::Mat R;
-    cv::Mat target_img;
-    cv::Mat output_img;
-    cv::Mat match_img;
+    cv::Mat R;                           // 現在フレームで推定された「仮想カメラの向き」。
+    cv::Mat target_img;                  // 現在のRで全天球画像全体を回転したグレースケール画像。
+    cv::Mat match_img;                   // 初期フレーム中央から切り出した、追跡対象の小窓。
+    cv::VideoWriter writer;
 
-    while(count<=1) {
-        std::chrono::system_clock::time_point  rap_start = std::chrono::system_clock::now();
-
-        // 入力画像を読み込む
-        cv::Mat img_in = cv::imread(homename + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_GRAYSCALE);
-        cv::Mat img_in_color = cv::imread(homename + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
-//        cv::Mat img_in = cv::imread("./rev_" + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_GRAYSCALE);
-//        cv::Mat img_in_color = cv::imread("./rev_" + filename + "/" + std::to_string(count) + ".png", cv::IMREAD_COLOR);
-        if(img_in.empty()){
-            // 処理時間計測終了
-            std::chrono::system_clock::time_point  stop = std::chrono::system_clock::now();
-            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms" << std::endl;
-            return 0;
+    // ============================================
+    // フレーム処理のメインループ
+    // ============================================
+    int count = 0;
+    while(true) {
+        // フレームの読み込み
+        cv::Mat frame_color;
+        cap.read(frame_color);
+        if(frame_color.empty()) {
+            break;  // 動画終了
         }
-//        img_in = cv::imread("bigimg.png", cv::IMREAD_GRAYSCALE);
 
-        // 初回の初期化処理
+        // フレームの保存
+        const auto frame_name = std::to_string(count) + ".png";
+        cv::imwrite((frames_dir / frame_name).string(), frame_color);
+
+        // グレースケールに変換
+        cv::Mat frame_gray;
+        cv::cvtColor(frame_color, frame_gray, cv::COLOR_BGR2GRAY);
+
+        std::chrono::system_clock::time_point lap_start = std::chrono::system_clock::now();
+
         if(count == count_init) {
-            // 推定器のインスタンス生成
-            clip_size = cv::Size(img_in.cols / div, img_in.rows / div);  // 生成する透視投影画像のサイズ
-            comparison_range = cv::Size(img_in.cols / div/div_, img_in.rows / div/div_);  // マッチング範囲
-            estimator = std::make_unique<Estimator>(img_in.size(), comparison_range, clip_size, focus);
+            // ========================================
+            // フレーム0: 初期化処理
+            // ========================================
+            // クリップサイズと比較範囲の計算
+            clip_size = cv::Size(frame_gray.cols / div, frame_gray.rows / div);
+            comparison_range = cv::Size(frame_gray.cols / div / div_, frame_gray.rows / div / div_);
+            estimator = std::make_unique<Estimator>(frame_gray.size(), comparison_range, clip_size, focus);
 
-            // 1枚目の画像の中から注視点を選択し透視投影画像を生成
+            // 注視点と参照点の指定（画像座標）。
+            // gaze がバレットタイム映像の中心に来る点、ref は回転の傾き（ロール）を決める補助点。
+            cv::Point2i gaze(2477, 1504);    // 注視点の座標
+            cv::Point2i ref(2781, 1491);     // 参照点の座標
 
-//            cv::Point2i gaze(25, 1580);  // 自販機
-//            cv::Point2i ref(36, 1584);  // 自販機
-//            cv::Point2i gaze(2924, 1486);  // 自販機_rev
-//            cv::Point2i ref(2945, 1486);  // 自販機_rev
-//            cv::Point2i gaze(473, 1490);  // 自販機_100フレーム目
-//            cv::Point2i ref(507, 1490);  // 自販機_100フレーム目
-//            cv::Point2i gaze(796, 1491);  // 自販機_130フレーム目
-//            cv::Point2i ref(820, 1491);  // 自販機_130フレーム目
-//            cv::Point2i gaze(5595, 1090);  // ポスト
-//            cv::Point2i ref(5625, 1055);  // ポスト
-//            cv::Point2i gaze(5734, 1519);  // 看板
-//            cv::Point2i ref(5755, 1522);  // 看板
-//            cv::Point2i gaze(2866, 1420);  // 自販機2_40
-//            cv::Point2i ref(2992, 1420);  // 自販機2_40
-//            cv::Point2i gaze(2774, 1364);  // 自販機3_100
-//            cv::Point2i ref(2848, 1359);  // 自販機3_100
-
-//            cv::Point2i gaze(2817 ,1930);  // 猫(cat1左耳)
-//           cv::Point2i ref(2999 ,1881);  // 猫(cat1右耳)
-//            cv::Point2i gaze(3040 ,1520);  // 猫(中心cat1左耳)
-//            cv::Point2i ref(3213 ,1520);  // 猫(中心cat1右耳)       
-//            cv::Point2i gaze(1330 ,665);  // 研究室
-//            cv::Point2i ref(1440 ,671);  // 研究室 
-//            cv::Point2i gaze(2660 ,1334);  // 研究室2
-//            cv::Point2i ref(2888 ,1347);  // 研究室 2
-//            cv::Point2i gaze(2542 ,1351);  // 外
-//            cv::Point2i ref(2681 ,1359);  // 外
-//            cv::Point2i gaze(2752 ,1444);  // 自販機
-//            cv::Point2i ref(3019 ,1445);  // 自販機
-//            cv::Point2i gaze(2478 ,1507);  // 自販機2
-//            cv::Point2i ref(2782 ,1494);  // 自販機2
-            cv::Point2i gaze(2744 ,1347);  // 研究室2
-            cv::Point2i ref(2918 ,1363);  // 研究室2
-//            cv::Point2i gaze(2711 ,1545);  // 外2
-//            cv::Point2i ref(2964 ,1532);  // 外2
-//            cv::Point2i gaze(2774 ,1418);  // 外3
-//            cv::Point2i ref(2981 ,1418);  // 外3
-
-            R = calc_R_by2p(gaze, ref, img_in.size());  // 注視点と参照点から回転行列を計算
-//            std::cout << "R_init" << R << std::endl;
-            // 計算した回転行列で最初のフレームだけ計算
-            target_img = estimator->rotate_img2(img_in, R, img_in.size());
+            // 注視点と参照点から回転行列を計算
+            R = calc_R_by2p(gaze, ref, frame_gray.size());
+            target_img = estimator->rotate_img2(frame_gray, R, frame_gray.size());
+            // 初期フレームをRで正面化したあと、中央の小窓を基準画像として保存する。
+            // 以降のフレームは、この小窓と一致するようにRを更新していく。
             match_img = estimator->rotate_comparison_range2(target_img);
-//            cv::imwrite(homename + filename + "/target_img.png", target_img);
-            cv::imwrite(homename + filename + "/target5/" + "/initial_clip.png", match_img);
-            output_img = estimator->rotate_clip(img_in_color, R);
-            cv::imwrite(homename + filename + "/target5/" + std::to_string(count) + ".png", output_img);
-            count+=fps;
-            continue;
+            cv::imwrite((run_dir / "initial_clip.png").string(), match_img);
+        } else {
+            // ========================================
+            // フレーム1以降: 回転推定と画像回転
+            // ========================================
+            // Levenberg-Marquardt法を使用して回転行列を推定する。
+            // 前フレームのRを初期値にすることで、動画内の連続した動きを追跡する。
+            R = estimator->estimate_R(frame_gray, target_img, R);
+            // グレースケール画像を回転
+            target_img = estimator->rotate_img2(frame_gray, R, frame_gray.size());
         }
 
-//        estimator->test_can_calc_error(img_in, target_img, R);  // デバッグ用
+        // カラー画像を回転させてバレットタイム画像を生成
+        cv::Mat output_img = estimator->rotate_clip(frame_color, R);
+        cv::imwrite((processed_dir / frame_name).string(), output_img);
 
-        // 手動で初期値をずらす用
-        // ヨー方向回転
-//        double theta = 2/180.0*M_PI;
-//        cv::Mat error_R = cv::Mat::zeros(3,3, CV_64F);
-//        std::cout << "yaw" << std::endl;
-//        error_R.ptr<double>(0)[0] = std::cos(theta);
-//        error_R.ptr<double>(0)[1] = -std::sin(theta);
-//        error_R.ptr<double>(1)[0] = std::sin(theta);
-//        error_R.ptr<double>(1)[1] = std::cos(theta);
-//        error_R.ptr<double>(2)[2] = 1;
-//        R = error_R * R;
+        // 出力動画ライターの初期化（フレーム0で実行）
+        if(!writer.isOpened()) {
+            writer.open(
+                    movie_path.string(),
+                    cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
+                    output_fps,
+                    output_img.size(),
+                    true);
+            if(!writer.isOpened()) {
+                std::cerr << "動画出力を開けません: " << movie_path << std::endl;
+                return 1;
+            }
+        }
 
-        // 回転行列を推定
-        R = estimator->estimate_R(img_in, target_img, R);
+        // 処理済みフレームを出力動画に書き込む
+        writer << output_img;
 
-        // 結果を出力する
-        target_img = estimator->rotate_img2(img_in, R, img_in.size());
-        output_img = estimator->rotate_clip(img_in_color, R);
-        cv::imwrite(homename + filename + "/target5/" + std::to_string(count) + ".png", output_img);
-        count += fps;
-
-        // 画像一枚にかかる時間を計測
-        std::chrono::system_clock::time_point  rap_end = std::chrono::system_clock::now();
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(rap_end - rap_start).count() << "ms" << std::endl;
+        // 処理時間の表示（フレーム0と30フレームごと）
+        std::chrono::system_clock::time_point lap_end = std::chrono::system_clock::now();
+        if(count == 0 || count % 30 == 0) {
+            std::cout << "frame " << count << ": "
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(lap_end - lap_start).count()
+                      << "ms" << std::endl;
+        }
+        count++;
     }
+
+    // ============================================
+    // 処理完了・結果表示
+    // ============================================
+    std::chrono::system_clock::time_point stop = std::chrono::system_clock::now();
+    std::cout << "processed frames: " << count << std::endl;
+    std::cout << "movie: " << movie_path << std::endl;
+    std::cout << "elapsed: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count()
+              << "ms" << std::endl;
+
+    return 0;
 }

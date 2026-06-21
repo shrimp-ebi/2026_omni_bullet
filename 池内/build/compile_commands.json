@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/build",
+  "command": "/usr/bin/c++  -I/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/src -isystem /usr/local/include/opencv4 -Wall -Wextra -O3 -std=gnu++17 -o CMakeFiles/spherical_bullettime.dir/main.cpp.o -c /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/main.cpp",
+  "file": "/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/main.cpp"
+},
+{
+  "directory": "/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/build/src",
+  "command": "/usr/bin/c++  -isystem /usr/local/include/opencv4 -Wall -Wextra -O3 -std=gnu++17 -o CMakeFiles/src_lib.dir/Estimator.cpp.o -c /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/src/Estimator.cpp",
+  "file": "/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/池内/src/Estimator.cpp"
+}
+]

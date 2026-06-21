@@ -14,28 +14,17 @@
 #include <opencv2/opencv.hpp>
 
 namespace spherical_bullet_time{
-    // 全天球画像上の座標を単位球面上の3Dベクトルへ変換し、
-    // 回転行列Rで視点方向を変えながら、追跡対象の小窓と出力クリップを生成するクラス。
-    // 役割は大きく3つ：
-    // 1. 全天球画像 <-> 極座標 <-> 3D座標 の変換
-    // 2. フレーム間で見た目が合う回転行列Rの推定
-    // 3. 推定したRでカラー画像を切り出してバレットタイム風の映像を作る
     class Estimator{
     public:
-        // img_size: 元の全天球画像サイズ
-        // comp_range: 回転推定に使う小窓サイズ
-        // clip_range: 最終的に動画へ書き出す切り出しサイズ
-        // focus: 仮想透視カメラの焦点距離
         explicit Estimator(cv::Size img_size, cv::Size comp_range, cv::Size clip_range, double focus);
 
-        // 画像全体を回転する古い実装。各画素ごとに座標変換をその場で計算する。
+        //画像を回転する
         static cv::Mat rotate_img(const cv::Mat& img, const cv::Mat& R, const cv::Size& img_size);
 
-        // 画像全体を回転する実装。事前計算したSbを使うため、座標変換の見通しがよい。
+        //画像を回転する2
         cv::Mat rotate_img2(const cv::Mat& img, const cv::Mat& R, const cv::Size& img_size);
 
-        // 入力画像を基準画像に最も近づける回転行列を推定する。
-        // R_iniは前フレームの推定結果で、LM法の初期値として使う。
+        //入力画像を出力画像へと変換するような回転行列を推定する
         cv::Mat estimate_R(const cv::Mat& img_in, const cv::Mat& base_clip, const cv::Mat& R_ini);
 
         // 誤差と勾配をcsvで吐く
@@ -64,9 +53,8 @@ namespace spherical_bullet_time{
         // 全天球画像を回転させて中心部分のみを切り出す
         [[nodiscard]] cv::Mat rotate_comparison_range(const cv::Mat& img_in, const cv::Mat& R) const;
 
-        // 全天球画像の中心部分のみを切り出す。
-        // 初期フレームを正面化した後の基準小窓を作るために使う。
-        [[nodiscard]] cv::Mat rotate_comparison_range2(const cv::Mat& img_in) const;
+        // 全天球画像を回転させて中心部分のみを切り出す2
+        [[nodiscard]] cv::Mat rotate_comparison_range2(const cv::Mat& img_in, const cv::Mat& R) const;
 
         // 全天球画像を回転させて指定されたサイズのバレットタイム画像を切り出す
         [[nodiscard]] cv::Mat rotate_clip(const cv::Mat& img_in, const cv::Mat& R) const;
@@ -84,9 +72,6 @@ namespace spherical_bullet_time{
 
         cv::Mat R_wc_;
         cv::Size img_size_;
-        // comp_range_cartesian_: 推定用小窓の各画素が指す3D方向。
-        // clip_range_cartesian_: 出力クリップの各画素が指す3D方向。
-        // Sb: 元の全天球画像の全画素が指す3D方向。
         cv::Mat comp_range_cartesian_;
         cv::Mat clip_range_cartesian_;
         cv::Mat Sb;

@@ -83,8 +83,13 @@ int lm_estimate_frame_file(const char *base_path, const char *ref_path,
     {
         double E_final = E;
         double dE = E_initial - E_final;
-        fprintf(stderr, "[LM] iters=%d E_init=%.6f E_final=%.6f dE=%.6f converged=%d\n",
-                iter, E_initial, E_final, dE, converged);
+        /* iters    : LM反復回数
+         * E_init   : 最適化前の目的関数値 E = (1/2N)Σ(Sr-Sb)²
+         * E_final  : 最適化後の目的関数値
+         * dE       : 目的関数の減少量 (E_init - E_final)
+         * converged: 1=収束(‖Δω‖<1e-8), 0=最大反復(500回)到達 */
+        printf("  [LM] iters=%-3d  E_init=%.6f  E_final=%.6f  dE=%.2e  converged=%d\n",
+               iter, E_initial, E_final, dE, converged);
     }
 
     /* 出力 */
@@ -130,8 +135,7 @@ int generate_gaze_frame_file(const char *in_path, const char *out_path,
 
     Vector3D G = image_to_world(u_g, v_g, W, H);
     Matrix3x3 R_gaze = build_R_gaze(G);
-    Matrix3x3 R_total = matrix_multiply(R_gaze, R_cum);
-    Matrix3x3 R_T = matrix_transpose(R_total);
+    Matrix3x3 R_gaze_T = matrix_transpose(R_gaze);
 
     int u_min = W / 4; int u_max = 3 * W / 4;
     int v_min = H / 4; int v_max = 3 * H / 4;
@@ -143,7 +147,8 @@ int generate_gaze_frame_file(const char *in_path, const char *out_path,
     for (int v = v_min; v < v_max; v++) {
         for (int u = u_min; u < u_max; u++) {
             Vector3D Xp = image_to_world(u, v, W, H);
-            Vector3D X = matrix_vector_multiply(R_T, Xp);
+            Vector3D X_ib = matrix_vector_multiply(R_gaze_T, Xp);
+            Vector3D X = matrix_vector_multiply(R_cum, X_ib);
             double u_in, v_in; world_to_image(X, W, H, &u_in, &v_in);
             uint8_t rgb[3]; get_pixel_bilinear(img, u_in, v_in, rgb);
             set_pixel(out, u - u_min, v - v_min, rgb);
@@ -171,8 +176,7 @@ int generate_gaze_frame_world_file(const char *in_path, const char *out_path,
 
     Vector3D G = vector_create(Gx, Gy, Gz);
     Matrix3x3 R_gaze = build_R_gaze(G);
-    Matrix3x3 R_total = matrix_multiply(R_gaze, R_cum);
-    Matrix3x3 R_T = matrix_transpose(R_total);
+    Matrix3x3 R_gaze_T = matrix_transpose(R_gaze);
 
     int u_min = W / 4; int u_max = 3 * W / 4;
     int v_min = H / 4; int v_max = 3 * H / 4;
@@ -184,7 +188,8 @@ int generate_gaze_frame_world_file(const char *in_path, const char *out_path,
     for (int v = v_min; v < v_max; v++) {
         for (int u = u_min; u < u_max; u++) {
             Vector3D Xp = image_to_world(u, v, W, H);
-            Vector3D X = matrix_vector_multiply(R_T, Xp);
+            Vector3D X_ib = matrix_vector_multiply(R_gaze_T, Xp);
+            Vector3D X = matrix_vector_multiply(R_cum, X_ib);
             double u_in, v_in; world_to_image(X, W, H, &u_in, &v_in);
             uint8_t rgb[3]; get_pixel_bilinear(img, u_in, v_in, rgb);
             set_pixel(out, u - u_min, v - v_min, rgb);
@@ -194,6 +199,134 @@ int generate_gaze_frame_world_file(const char *in_path, const char *out_path,
     int ok = image_save_jpg(out_path, out, 95);
     image_free(out);
     image_free(img);
+    return ok ? 0 : 1;
+}
+
+/* ============================================================
+ * 2点方式 API
+ * ============================================================ */
+
+/* 注視点(u_gaze,v_gaze)と補助点(u_ref,v_ref)の画像座標から
+ * 初期回転行列 R_0 を計算して R_out[9](row-major)に格納する。
+ *
+ * 論文式:
+ *   ez = normalize(G)
+ *   ey = normalize(G × Gs)   ← この外積の順序を厳守
+ *   ex = ey × ez
+ *   R_0 の各列に [ex | ey | ez] を配置
+ */
+int calc_R_2points_file(const char *img_path,
+                        int u_gaze, int v_gaze,
+                        int u_ref,  int v_ref,
+                        double R_out[9])
+{
+    Image *img = image_load(img_path);
+    if (!img) return 1;
+    int W = img->width, H = img->height;
+    image_free(img);
+
+    Vector3D G  = image_to_world(u_gaze, v_gaze, W, H);
+    Vector3D Gs = image_to_world(u_ref,  v_ref,  W, H);
+
+    Vector3D ez = vector_normalize(G);
+    Vector3D ey_raw = vector_cross(G, Gs);   /* G × Gs の順 */
+    if (vector_norm(ey_raw) < 1e-10) return 1; /* G と Gs が平行 */
+    Vector3D ey = vector_normalize(ey_raw);
+    Vector3D ex = vector_cross(ey, ez);      /* ey × ez */
+
+    /* R_0 は列に [ex | ey | ez] を配置: R_0[i][j] = {ex,ey,ez}[j][i] */
+    R_out[0] = ex.x;  R_out[1] = ey.x;  R_out[2] = ez.x;
+    R_out[3] = ex.y;  R_out[4] = ey.y;  R_out[5] = ez.y;
+    R_out[6] = ex.z;  R_out[7] = ey.z;  R_out[8] = ez.z;
+    return 0;
+}
+
+/* 2点方式用フルサイズ出力 (Ib 生成専用)。
+ * R_0_param[9]: calc_R_2points_file が返す初期回転行列(row-major)。
+ * R_cum が単位行列のとき、出力の中心が注視点 G 方向になる。
+ *
+ * 逆マッピング:
+ *   X_ib  = R_0 × Xp          (出力方向を Ib 座標へ)
+ *   X     = R_cum × X_ib      (Ib 座標を現フレームへ)
+ */
+int generate_gaze_full_R0_file(const char *in_path, const char *out_path,
+                                const double R_0_param[9],
+                                const double R_cumulative[9])
+{
+    Matrix3x3 R_0;
+    R_0.m[0][0]=R_0_param[0]; R_0.m[0][1]=R_0_param[1]; R_0.m[0][2]=R_0_param[2];
+    R_0.m[1][0]=R_0_param[3]; R_0.m[1][1]=R_0_param[4]; R_0.m[1][2]=R_0_param[5];
+    R_0.m[2][0]=R_0_param[6]; R_0.m[2][1]=R_0_param[7]; R_0.m[2][2]=R_0_param[8];
+
+    Matrix3x3 R_cum;
+    R_cum.m[0][0]=R_cumulative[0]; R_cum.m[0][1]=R_cumulative[1]; R_cum.m[0][2]=R_cumulative[2];
+    R_cum.m[1][0]=R_cumulative[3]; R_cum.m[1][1]=R_cumulative[4]; R_cum.m[1][2]=R_cumulative[5];
+    R_cum.m[2][0]=R_cumulative[6]; R_cum.m[2][1]=R_cumulative[7]; R_cum.m[2][2]=R_cumulative[8];
+
+    Image *img = image_load(in_path);
+    if (!img) return 1;
+    int W = img->width, H = img->height;
+
+    Image *out = image_create(W, H, img->channels);
+    if (!out) { image_free(img); return 1; }
+
+    for (int v = 0; v < H; v++) {
+        for (int u = 0; u < W; u++) {
+            Vector3D Xp   = image_to_world(u, v, W, H);
+            Vector3D X_ib = matrix_vector_multiply(R_0,   Xp);
+            Vector3D X    = matrix_vector_multiply(R_cum,  X_ib);
+            double u_in, v_in; world_to_image(X, W, H, &u_in, &v_in);
+            uint8_t rgb[3]; get_pixel_bilinear(img, u_in, v_in, rgb);
+            set_pixel(out, u, v, rgb);
+        }
+    }
+
+    int ok = image_save_jpg(out_path, out, 95);
+    image_free(out); image_free(img);
+    return ok ? 0 : 1;
+}
+
+/* 2点方式用クリップ出力 (各フレーム用)。
+ * 逆マッピングは generate_gaze_full_R0_file と同一、切り出し範囲のみ異なる。
+ */
+int generate_gaze_frame_R0_file(const char *in_path, const char *out_path,
+                                 const double R_0_param[9],
+                                 const double R_cumulative[9])
+{
+    Matrix3x3 R_0;
+    R_0.m[0][0]=R_0_param[0]; R_0.m[0][1]=R_0_param[1]; R_0.m[0][2]=R_0_param[2];
+    R_0.m[1][0]=R_0_param[3]; R_0.m[1][1]=R_0_param[4]; R_0.m[1][2]=R_0_param[5];
+    R_0.m[2][0]=R_0_param[6]; R_0.m[2][1]=R_0_param[7]; R_0.m[2][2]=R_0_param[8];
+
+    Matrix3x3 R_cum;
+    R_cum.m[0][0]=R_cumulative[0]; R_cum.m[0][1]=R_cumulative[1]; R_cum.m[0][2]=R_cumulative[2];
+    R_cum.m[1][0]=R_cumulative[3]; R_cum.m[1][1]=R_cumulative[4]; R_cum.m[1][2]=R_cumulative[5];
+    R_cum.m[2][0]=R_cumulative[6]; R_cum.m[2][1]=R_cumulative[7]; R_cum.m[2][2]=R_cumulative[8];
+
+    Image *img = image_load(in_path);
+    if (!img) return 1;
+    int W = img->width, H = img->height;
+
+    int u_min = W / 4, u_max = 3 * W / 4;
+    int v_min = H / 4, v_max = 3 * H / 4;
+    int W_out = u_max - u_min, H_out = v_max - v_min;
+
+    Image *out = image_create(W_out, H_out, img->channels);
+    if (!out) { image_free(img); return 1; }
+
+    for (int v = v_min; v < v_max; v++) {
+        for (int u = u_min; u < u_max; u++) {
+            Vector3D Xp   = image_to_world(u, v, W, H);
+            Vector3D X_ib = matrix_vector_multiply(R_0,   Xp);
+            Vector3D X    = matrix_vector_multiply(R_cum,  X_ib);
+            double u_in, v_in; world_to_image(X, W, H, &u_in, &v_in);
+            uint8_t rgb[3]; get_pixel_bilinear(img, u_in, v_in, rgb);
+            set_pixel(out, u - u_min, v - v_min, rgb);
+        }
+    }
+
+    int ok = image_save_jpg(out_path, out, 95);
+    image_free(out); image_free(img);
     return ok ? 0 : 1;
 }
 

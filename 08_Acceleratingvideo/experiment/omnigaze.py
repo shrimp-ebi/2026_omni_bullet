@@ -58,5 +58,52 @@ def generate_gaze_full_world(in_path, out_path, Gx, Gy, Gz, R_cumulative):
         raise RuntimeError('generate_gaze_full_world_file failed')
     return True
 
+# ============================================================
+# 2点方式 API
+# ============================================================
+
+# int calc_R_2points_file(const char *img_path,
+#                         int u_gaze, int v_gaze, int u_ref, int v_ref,
+#                         double R_out[9]);
+lib.calc_R_2points_file.argtypes = [c_char_p, c_int, c_int, c_int, c_int, POINTER(c_double)]
+lib.calc_R_2points_file.restype = c_int
+
+# int generate_gaze_full_R0_file(const char *in_path, const char *out_path,
+#                                 const double R_0_param[9], const double R_cumulative[9]);
+lib.generate_gaze_full_R0_file.argtypes = [c_char_p, c_char_p, POINTER(c_double), POINTER(c_double)]
+lib.generate_gaze_full_R0_file.restype = c_int
+
+# int generate_gaze_frame_R0_file(const char *in_path, const char *out_path,
+#                                  const double R_0_param[9], const double R_cumulative[9]);
+lib.generate_gaze_frame_R0_file.argtypes = [c_char_p, c_char_p, POINTER(c_double), POINTER(c_double)]
+lib.generate_gaze_frame_R0_file.restype = c_int
+
+def calc_R_2points(img_path, u_gaze, v_gaze, u_ref, v_ref):
+    """注視点と補助点の画像座標から初期回転行列 R_0 を計算する(9要素リスト)。"""
+    R_out = (c_double * 9)()
+    ret = lib.calc_R_2points_file(img_path.encode(), int(u_gaze), int(v_gaze),
+                                   int(u_ref), int(v_ref), R_out)
+    if ret != 0:
+        raise RuntimeError('calc_R_2points_file failed')
+    return list(R_out)
+
+def generate_gaze_full_R0(in_path, out_path, R_0, R_cumulative):
+    """2点方式: フルサイズ Ib 生成。R_0 は calc_R_2points の戻り値。"""
+    R_0_arr  = (c_double * 9)(*R_0)
+    R_cum_arr = (c_double * 9)(*R_cumulative)
+    ret = lib.generate_gaze_full_R0_file(in_path.encode(), out_path.encode(), R_0_arr, R_cum_arr)
+    if ret != 0:
+        raise RuntimeError('generate_gaze_full_R0_file failed')
+    return True
+
+def generate_gaze_frame_R0(in_path, out_path, R_0, R_cumulative):
+    """2点方式: クリップ注視画像生成。R_0 は calc_R_2points の戻り値。"""
+    R_0_arr  = (c_double * 9)(*R_0)
+    R_cum_arr = (c_double * 9)(*R_cumulative)
+    ret = lib.generate_gaze_frame_R0_file(in_path.encode(), out_path.encode(), R_0_arr, R_cum_arr)
+    if ret != 0:
+        raise RuntimeError('generate_gaze_frame_R0_file failed')
+    return True
+
 if __name__ == '__main__':
     print('Load lib:', lib_path)

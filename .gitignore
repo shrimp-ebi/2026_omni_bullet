@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 
+# ビルド/実行結果
+runs/
+build_y233324/
+
 # 動画
 *.mp4
 *.avi
