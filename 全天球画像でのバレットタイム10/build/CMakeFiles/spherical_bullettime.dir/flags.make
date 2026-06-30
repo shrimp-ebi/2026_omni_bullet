@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/home/h233304/全天球画像でのバレットタイム10/src -isystem /usr/include/opencv4
+CXX_INCLUDES = -I/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/src -isystem /usr/local/include/opencv4
 
 CXX_FLAGS = -Wall -Wextra -O3
 

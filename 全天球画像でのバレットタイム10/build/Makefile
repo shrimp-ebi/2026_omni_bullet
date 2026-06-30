@@ -57,10 +57,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/h233304/全天球画像でのバレットタイム10
+CMAKE_SOURCE_DIR = /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/h233304/全天球画像でのバレットタイム10/build
+CMAKE_BINARY_DIR = /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -87,9 +87,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/h233304/全天球画像でのバレットタイム10/build/CMakeFiles /home/h233304/全天球画像でのバレットタイム10/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/build/CMakeFiles /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/h233304/全天球画像でのバレットタイム10/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target

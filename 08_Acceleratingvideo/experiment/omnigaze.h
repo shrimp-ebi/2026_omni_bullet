@@ -54,6 +54,21 @@ int generate_gaze_frame_R0_file(const char *in_path, const char *out_path,
                                  const double R_0_param[9],
                                  const double R_cumulative[9]);
 
+/* ============================================================
+ * 論文方式 API（単一 R 管理）
+ * ============================================================ */
+
+/* 注視方向ベクトル(Gx,Gy,Gz)から初期回転行列を計算して R_out[9](row-major)に格納する。
+ * build_R_gaze と同一の計算。Python 側から注視点の初期 R を取得するための API。 */
+int compute_R_from_gaze_world_file(double Gx, double Gy, double Gz,
+                                    double R_out[9]);
+
+/* 単一回転行列 R による全解像度注視画像生成（論文方式）。
+ * 逆マッピング: X_in = R^T * Xp
+ * R は注視点を中心にする完全な回転行列として単一管理される。 */
+int generate_gaze_full_single_R_file(const char *in_path, const char *out_path,
+                                      const double R_param[9]);
+
 #ifdef __cplusplus
 }
 #endif

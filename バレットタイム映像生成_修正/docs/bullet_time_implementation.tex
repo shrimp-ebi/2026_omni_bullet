@@ -1,0 +1,642 @@
+% !TEX program = lualatex
+\documentclass{ltjsarticle}          % 一段組
+
+\textwidth 180mm
+\textheight 255mm
+\oddsidemargin -12mm
+\topmargin -15mm
+\columnsep 10mm
+
+\usepackage{styles/labheadings}
+\usepackage{graphicx,color}
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{listings,jvlisting}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\lstset{
+  basicstyle={\ttfamily},
+  identifierstyle={\small},
+  commentstyle={\small\itshape},
+  keywordstyle={\small\bfseries},
+  ndkeywordstyle={\small},
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},
+  numbers=left,
+  xrightmargin=0pt,
+  xleftmargin=3em,
+  numberstyle={\scriptsize},
+  stepnumber=1,
+  numbersep=0.8em,
+  lineskip=-0.5ex
+}
+\renewcommand{\lstlistingname}{ソースコード}
+
+\input{numerical_definition.tex}
+
+\usepackage[
+  bookmarks=true,
+  bookmarksnumbered=true,
+colorlinks=true]{hyperref}
+
+\pagestyle{labheadings}
+\headerleft{全方位画像からの注視点追跡によるバレットタイム映像生成}
+\headerright{実装ドキュメント}
+
+\begin{document}
+
+\vspace*{2ex}
+\begin{center}
+  {\Large \bf バレットタイム注視追従プログラムの設計・計算式・アルゴリズム}\\[3mm]
+  {\large バレットタイム映像生成\_修正}
+\end{center}
+
+% ==================================================
+\newcommand{\reffig}[1]{\hyperref[#1]{図\ref{#1}}}
+\newcommand{\refeq}[1]{\hyperref[#1]{式(\ref{#1})}}
+\newcommand{\reftab}[1]{\hyperref[#1]{表\ref{#1}}}
+\newcommand{\refsec}[1]{\hyperref[#1]{\ref{#1}章}}
+\newcommand{\refsubsec}[1]{\hyperref[#1]{\ref{#1}節}}
+
+% ==================================================
+\section*{概要}
+全方位画像を入力として，任意の注視点が画像中心に位置する注視画像を生成し，バレットタイム映像を作成するプログラムの設計をまとめる．
+本ドキュメントは，研究室内資料\cite{bib_1}および池内\cite{bib_2}の注視画像生成手法，3月・4月のゼミ報告資料（2026-02-13，2026-04-10）を基礎とし，
+実装プロジェクト \texttt{バレットタイム映像生成\_修正} で採用した設計，計算式，アルゴリズムを記述する．
+
+以下の内容について述べる．
+\begin{itemize}
+  \item 画像座標系$(u,v)$，角度座標系$(\theta, \phi)$，世界座標系$(X,Y,Z)$の3つの座標系間の変換
+  \item 注視点$\bm{G}$から初期回転行列$R_0$を構成し注視画像を生成する手法
+  \item 3パラメータ回転推定の目的関数，微分，Levenberg--Marquardt法（LM法）による推定
+  \item 連続フレームへの適用（栖原ロール）によるバレットタイム映像生成パイプライン
+  \item ゼミ報告資料との相違点
+\end{itemize}
+
+% ==================================================
+\section{座標系とその変換}
+\label{sec:coord}
+\subsection{本研究で用いる座標系の定義}
+本研究では，全方位画像を画素値を持つ単位球面上の3次元点として扱い\cite{bib_1}，処理を行う．
+そのため，以下の3つの座標系で表現する．
+\begin{itemize}
+  \item \textbf{画像座標系 $(u, v)$} :
+  入力画像を通常の2次元画像として扱う座標系であり，
+  画像の左上を原点とし，右方向を$u$軸，下方向を$v$軸とする．
+
+  \item \textbf{角度座標系 $(\theta, \phi)$} :
+  全方位画像を球面上に投影したときの角度を表す座標系である．
+  正距円筒画像において横方向を経度$\theta$，縦方向を緯度$\phi$とする．
+
+  \item \textbf{世界座標系 $(X, Y, Z)$} :
+  単位球面上の3次元空間における座標系であり，全方位画像上の各画素を歪みなく扱うために用いられる．
+  画像中心に対応する方向を$Z$軸正方向とする．
+\end{itemize}
+
+世界座標系を画像中心の点が$Z$軸正方向を向くように定義すると，画像中心の角度座標は$(\theta, \phi) = (0, \pi/2)$となる．
+
+角度の定義は以下の通りである．
+\begin{itemize}
+  \item $\theta$  :  $Y$軸周りの回転角度（$Z$軸から$X$軸に向かう方向が正）
+  \item $\phi$  :  $X$軸周りの回転角度（$Y$軸から$Z$軸に向かう方向が正）
+\end{itemize}
+
+\subsection{変換式}
+画像座標系$(u,v)$と角度座標系$(\theta, \phi)$の関係は以下のように表される．
+ここで，$W$は画像の横幅，$H$は画像の縦幅の画素数を表す．
+
+\begin{align}
+  (\theta, \phi) &= \left( \left(u - \frac{W}{2}\right) \frac{2\pi}{W}, -\left(v - H\right) \frac{\pi}{H} \right)
+  \label{eq:image_to_angle} \\
+  (u, v) &= \left( \left(\theta + \pi\right) \frac{W}{2\pi}, -\left(\phi - \pi\right) \frac{H}{\pi} \right)
+  \label{eq:angle_to_image}
+\end{align}
+
+正距円筒画像の角度座標$(\theta, \phi)$に対応する世界座標$(X, Y, Z)$は，以下の式で表される．
+
+\begin{equation}
+  \begin{cases}
+    X = \sin \phi \sin \theta \\
+    Y = \cos \phi \\
+    Z = \sin \phi \cos \theta
+  \end{cases}
+  \label{eq:angle_to_world}
+\end{equation}
+
+この変換により，全方位画像上の画素を単位球面上の3次元点として扱うことが可能となる．
+以降の回転処理は，この世界座標系上で行う．
+
+\subsubsection{実装}
+上記の変換式は \texttt{src/coord\_transform.c} に実装されている．
+主要な関数の対応を\reftab{tab:coord_impl}に示す．
+
+\begin{table}[H]
+  \centering
+  \caption{座標変換の実装対応}
+  \label{tab:coord_impl}
+  \begin{tabular}{l|l}
+    \hline
+    数式 & 実装関数 \\
+    \hline
+    \refeq{eq:image_to_angle} & \texttt{image\_to\_angle} \\
+    \refeq{eq:angle_to_image} & \texttt{angle\_to\_image}，\texttt{world\_to\_image} \\
+    \refeq{eq:angle_to_world} & \texttt{angle\_to\_world}，\texttt{image\_to\_world} \\
+    \hline
+  \end{tabular}
+\end{table}
+
+% ==================================================
+\section{注視画像生成の考え方}
+\subsection{注視画像とは}
+注視画像とは，指定した点（注視点）が画像中心に映るように視点を回転させて生成した画像のことである．
+全方位画像は 360 度全方向の情報を含んでいるため，カメラの物理的な移動を行わなくても，
+球面上での回転操作により視線方向を変更できる．
+
+本研究では，全方位画像を単位球面上の点集合として扱い，回転行列を用いて座標変換を行うことで，
+注視点を光軸方向（$Z$軸方向）に一致させる．
+
+\subsection{回転行列を用いた生成\cite{bib_2}}
+注視画像を生成するためには，画像中の注視点が光軸方向を向くように視点を変更する必要がある．
+回転行列$R$は，回転後のカメラ座標系の3つの軸ベクトルを列として並べた$3 \times 3$行列として表される．
+
+\begin{equation}
+R = \begin{pmatrix}
+\bm{e}_x & \bm{e}_y & \bm{e}_z
+\end{pmatrix}
+= \begin{pmatrix}
+e_{x1} & e_{y1} & e_{z1} \\
+e_{x2} & e_{y2} & e_{z2} \\
+e_{x3} & e_{y3} & e_{z3}
+\end{pmatrix}
+\label{eq:rotation_matrix}
+\end{equation}
+
+ここで，
+\begin{itemize}
+  \item $\bm{e}_x$：回転後のカメラ座標系の$X$軸方向の単位ベクトル（右方向）
+  \item $\bm{e}_y$：回転後のカメラ座標系の$Y$軸方向の単位ベクトル（上方向）
+  \item $\bm{e}_z$：回転後のカメラ座標系の$Z$軸方向の単位ベクトル（前方向，光軸）
+\end{itemize}
+
+\subsubsection{$Z$軸方向の計算（光軸方向）}
+全方位画像上で指定された注視点に対応する単位球面上のベクトルを$\bm{G}$とする．
+注視点$\bm{G}$が画像中心に映るためには，カメラの$Z$軸が注視点方向を向く必要がある．
+\begin{equation}
+  \bm{e}_z = N[\bm{G}]
+  \label{eq:ez}
+\end{equation}
+ここで，$N[\cdot]$は正規化（単位ベクトル化）を表す．
+
+\subsubsection{$X$軸・$Y$軸方向の計算（本プログラムの方式）}
+2026-02-13の報告資料では，補助点$\bm{G}_s$を用いて
+$\bm{e}_y = N[\bm{G} \times \bm{G}_s]$，$\bm{e}_x = \bm{e}_y \times \bm{e}_z$
+としていた（\refsubsec{subsec:diff_gs}で相違を述べる）．
+
+本プログラムでは補助点を用いず，基準上方向ベクトル$\bm{up} = (0, 1, 0)^\top$を用いる．
+\begin{align}
+  \bm{e}_x &= N[\bm{up} \times \bm{e}_z]
+  \label{eq:ex_impl} \\
+  \bm{e}_y &= N[\bm{e}_z \times \bm{e}_x]
+  \label{eq:ey_impl}
+\end{align}
+$\bm{up}$と$\bm{e}_z$が平行に近い場合は，$\bm{up} = (1, 0, 0)^\top$に切り替える．
+
+\refeq{eq:ez}，\refeq{eq:ex_impl}，\refeq{eq:ey_impl}を\refeq{eq:rotation_matrix}に代入することで初期回転行列$R_0$が求まる．
+実装では \texttt{experiment/lm\_video.c} の \texttt{build\_initial\_rotation} において，
+$R_0$を列ベクトル$[\bm{e}_x\ \bm{e}_y\ \bm{e}_z]$として格納する（転置しない）．
+このとき$R_0\bm{e}_z = \bm{G}$が成り立ち，画像中心に注視点が来る．
+
+\subsection{写像を用いた画像生成}
+注視画像を生成する際には，出力画像の各画素に対応する入力画像中の画素を求める必要がある．
+
+2026-02-13の報告資料では，回転行列の転置$R^\top$を用いた逆変換
+\begin{equation}
+  \bm{X} = R^\top \bm{X}'
+  \label{eq:inverse_transform_paper}
+\end{equation}
+により画像生成を行っていた（\refsubsec{subsec:diff_render}で相違を述べる）．
+
+本プログラムでは，LM法の目的関数と同じ向きの写像
+\begin{equation}
+  \bm{X} = R\,\bm{X}'
+  \label{eq:forward_render}
+\end{equation}
+を用いる．
+ここで$\bm{X}'$は出力画素$(u', v')$の世界座標，$\bm{X}$は入力画像上でサンプルする方向である．
+
+\subsubsection{注視画像生成アルゴリズム}
+出力画像の各画素$(u', v')$に対して以下を実行する（\texttt{generate\_gaze\_frame}）．
+\begin{enumerate}
+  \item \refeq{eq:image_to_angle}，\refeq{eq:angle_to_world}により，出力画素を世界座標$\bm{X}'$に変換する
+  \item \refeq{eq:forward_render}により，$\bm{X} = R\bm{X}'$を計算する
+  \item $\bm{X}$を世界座標から画像座標$(u, v)$に変換する
+  \item バイリニア補間により入力画像から画素値を取得し，出力に書き込む
+\end{enumerate}
+
+frame0では$R = R_0$として \texttt{generate\_gaze\_at\_gaze\_point} を用い，LM法は実行しない．
+
+% ==================================================
+\section{3パラメータ回転推定}
+回転はリー代数に基づく回転ベクトル $\boldsymbol{\omega} = (\omega_1, \omega_2, \omega_3)^\top$
+で表現し，LM 法により微小回転量 $\Delta\boldsymbol{\omega}$ を反復推定する．
+推定のたびに回転行列を
+\begin{equation}
+  R \leftarrow \Delta R(\Delta\bm{\omega})\,R
+  \label{eq:R_update}
+\end{equation}
+と更新し，収束したときの $R$ を推定結果とする．
+
+\subsection{目的関数の定義}
+基準画像$I_b$および参照画像$I_r$を単位球面上に投影した画像をそれぞれ $S_b(X,Y,Z)$，$S_r(X,Y,Z)$ とする．
+基準画像上の点$\bm{X} = (X, Y, Z)^\top$を回転行列$R$で回転させた座標$\bm{X}' = (X', Y', Z')^\top$は，以下のように計算される．
+
+\begin{equation}
+  \bm{X}' = R\bm{X}
+  \label{eq:rotation}
+\end{equation}
+
+目的関数$E$を以下のように定義する :
+\begin{equation}
+  E = \dfrac{1}{2N} \sum_{(X,Y,Z) \in \mathcal{T}} \left( S_r(X', Y', Z') - S_b(X, Y, Z) \right)^2
+  \label{eq:E_def}
+\end{equation}
+
+ここで，$\mathcal{T}$は基準画像上の注視点を含む周辺領域，$N$は領域$\mathcal{T}$内の画素数である．
+本プログラムでは輝度$S$をRGB 3チャンネルの平均値として計算する．
+
+\subsection{目的関数の微分}
+目的関数$E$のパラメータ$\omega_k$での1階微分は，以下のように書ける．
+\begin{equation}
+  \dfrac{\partial E}{\partial \omega_k} = \dfrac{1}{N} \sum (S_r - S_b) \left( \dfrac{\partial S_r}{\partial X'} \dfrac{\partial X'}{\partial \omega_k} + \dfrac{\partial S_r}{\partial Y'} \dfrac{\partial Y'}{\partial \omega_k} + \dfrac{\partial S_r}{\partial Z'} \dfrac{\partial Z'}{\partial \omega_k} \right)
+  \label{eq:first_derivative}
+\end{equation}
+
+ガウス・ニュートン近似による2階微分は以下のとおりである．
+\begin{equation}
+  \dfrac{\partial^2 E}{\partial \omega_k \partial \omega_l} = \dfrac{1}{N} \sum_{(X,Y,Z) \in \mathcal{T}}
+  \left( \dfrac{\partial S_r}{\partial X'} \dfrac{\partial X'}{\partial \omega_k} + \cdots \right)
+  \left( \dfrac{\partial S_r}{\partial X'} \dfrac{\partial X'}{\partial \omega_l} + \cdots \right)
+  \label{eq:second_derivative}
+\end{equation}
+
+\subsection{回転に関する微分}
+$\bm{X}'$の$\omega_1, \omega_2, \omega_3$での微分は以下のように書ける（2026-04-10報告資料と同一）．
+\begin{align}
+  \dfrac{\partial \bm{X}'}{\partial \omega_1} &=
+  \begin{pmatrix}
+    0 & 0 & 0 \\
+    -R_{31} & -R_{32} & -R_{33} \\
+    R_{21} & R_{22} & R_{23}
+  \end{pmatrix}
+  \bm{X}
+  \label{eq:dX_domega1} \\
+  \dfrac{\partial \bm{X}'}{\partial \omega_2} &=
+  \begin{pmatrix}
+    R_{31} & R_{32} & R_{33} \\
+    0 & 0 & 0 \\
+    -R_{11} & -R_{12} & -R_{13}
+  \end{pmatrix}
+  \bm{X}
+  \label{eq:dX_domega2} \\
+  \dfrac{\partial \bm{X}'}{\partial \omega_3} &=
+  \begin{pmatrix}
+    -R_{21} & -R_{22} & -R_{23} \\
+    R_{11} & R_{12} & R_{13} \\
+    0 & 0 & 0
+  \end{pmatrix}
+  \bm{X}
+  \label{eq:dX_domega3}
+\end{align}
+
+\subsection{画像の微分}
+$\dfrac{\partial S_r}{\partial X'}$等は連鎖律により
+\begin{equation}
+  \dfrac{\partial S_r}{\partial X'} = \dfrac{\partial S_r}{\partial \theta} \dfrac{\partial \theta}{\partial X'} + \dfrac{\partial S_r}{\partial \phi} \dfrac{\partial \phi}{\partial X'}
+  \label{eq:chain_rule}
+\end{equation}
+として計算する．
+$\dfrac{\partial S_r}{\partial \theta}$，$\dfrac{\partial S_r}{\partial \phi}$は正距円筒画像上の中央差分（ガウシアン重み付き）で求める．
+
+世界座標から角度への偏微分は以下のとおりである（$r=1$）．
+\begin{equation}
+  \begin{aligned}
+    \frac{\partial \theta}{\partial X} &= \frac{\cos\theta}{\sin\phi}, &
+    \frac{\partial \theta}{\partial Y} &= 0, &
+    \frac{\partial \theta}{\partial Z} &= -\frac{\sin\theta}{\sin\phi}, \\
+    \frac{\partial \phi}{\partial X} &= \cos\phi \sin\theta, &
+    \frac{\partial \phi}{\partial Y} &= -\sin\phi, &
+    \frac{\partial \phi}{\partial Z} &= \cos\phi \cos\theta
+  \end{aligned}
+  \label{eq:spherical_derivatives}
+\end{equation}
+
+上記は \texttt{experiment/objective\_3param.c} に実装されている．
+
+\subsection{LM法の更新式}
+LM法の更新式より微小回転量$\Delta\bm{\omega}$を求める．
+\begin{equation}
+  \begin{pmatrix}
+    \Delta\omega_1 \\ \Delta\omega_2 \\ \Delta\omega_3
+  \end{pmatrix}
+  = -
+  \begin{pmatrix}
+    (1 + C)\dfrac{\partial^2 E}{\partial \omega_1^2} & \cdots & \cdots \\
+    \cdots & (1 + C)\dfrac{\partial^2 E}{\partial \omega_2^2} & \cdots \\
+    \cdots & \cdots & (1 + C)\dfrac{\partial^2 E}{\partial \omega_3^2}
+  \end{pmatrix}^{-1}
+  \begin{pmatrix}
+    \dfrac{\partial E}{\partial \omega_1} \\ \dfrac{\partial E}{\partial \omega_2} \\ \dfrac{\partial E}{\partial \omega_3}
+  \end{pmatrix}
+  \label{eq:lm_update}
+\end{equation}
+
+\subsection{ロドリゲスの回転公式}
+求めた$\Delta\bm{\omega}$からロドリゲスの回転公式を用いて更新行列$\Delta R$を計算する．
+回転角$\theta = \|\Delta\bm{\omega}\|$，回転軸$\bm{n} = \Delta\bm{\omega}/\|\Delta\bm{\omega}\|$として，
+\begin{equation}
+  \Delta R =
+  \begin{pmatrix}
+    n_1^2(1-\cos\theta) + \cos\theta & n_1 n_2(1-\cos\theta) - n_3\sin\theta & n_1 n_3(1-\cos\theta) + n_2\sin\theta \\
+    n_2 n_1(1-\cos\theta) + n_3\sin\theta & n_2^2(1-\cos\theta) + \cos\theta & n_2 n_3(1-\cos\theta) - n_1\sin\theta \\
+    n_3 n_1(1-\cos\theta) - n_2\sin\theta & n_3 n_2(1-\cos\theta) + n_1\sin\theta & n_3^2(1-\cos\theta) + \cos\theta
+  \end{pmatrix}
+  \label{eq:rodrigues}
+\end{equation}
+（2026-04-10報告資料の式(3.17)と同一）．
+
+% ==================================================
+\section{推定アルゴリズムの全体手順}
+\subsection{入力と出力}
+\noindent
+\textbf{入力 : }
+\begin{itemize}
+  \item 基準画像 $I_b$（前フレームの注視画像）
+  \item 参照画像 $I_r$（現フレームの生画像）
+  \item 回転行列の初期値 $R_{\mathrm{prev}}$（前フレームで推定された $R$）
+\end{itemize}
+
+\noindent
+\textbf{出力 : }
+\begin{itemize}
+  \item 推定された回転行列 $R$
+\end{itemize}
+
+\subsection{アルゴリズム}
+\begin{enumerate}
+  \item 推定する回転行列$R$に初期値$R_{\mathrm{prev}}$を与える．
+    frame0では$R_0$のみを用い，LM法は実行しない．
+
+  \item LM法の定数$C$を$C = 0.0001$ として初期化する．
+
+  \item 参照画像$I_r$の$\dfrac{\partial S_r}{\partial \theta}$，$\dfrac{\partial S_r}{\partial \phi}$
+    を各反復で計算する．
+
+  \item 比較領域$\mathcal{T}$（画像中心付近の小窓）に対して反復（LM法）を行う :
+    \begin{enumerate}
+      \item 各点 $\bm{X}$ について，$\bm{X}' = R\bm{X}$を計算する（\refeq{eq:rotation}）
+      \item 領域 $\mathcal{T}$ に対して\refeq{eq:E_def}で目的関数$E$を計算する
+      \item \refeq{eq:first_derivative}，\refeq{eq:second_derivative}より勾配とヘッセ行列を計算する
+      \item \refeq{eq:lm_update}より$\Delta\bm{\omega}$を求める
+      \item ロドリゲス公式（\refeq{eq:rodrigues}）で$\Delta R$を計算し，$R' \leftarrow \Delta R \cdot R$とする
+      \item $E' < E$なら更新を受理（$R \leftarrow R'$，$C \leftarrow C/10$），
+        そうでなければ$C \leftarrow 10C$として再試行する
+      \item $\|\Delta\bm{\omega}\| < \epsilon_\omega$なら終了する
+    \end{enumerate}
+\end{enumerate}
+
+\subsubsection{本プログラムのパラメータ}
+\reftab{tab:lm_params}に，2026-04-10報告資料の検証設定との対応を示す．
+
+\begin{table}[H]
+  \centering
+  \caption{LM法の実装パラメータ}
+  \label{tab:lm_params}
+  \begin{tabular}{l|c|c}
+    \hline
+    項目 & 報告資料（検証時） & 本プログラム \\
+    \hline
+    $C$の初期値 & $0.0001$ & $0.0001$ \\
+    $\epsilon_\omega$ & $10^{-8}$ & $10^{-10}$ \\
+    最大反復回数 & $100$ & $300$ \\
+    比較領域$\mathcal{T}$ &
+      $380 \times 190$ @ $6080 \times 3040$ &
+      同比率の\textbf{半分}（中心重視） \\
+    輝度$S$ & グレースケール & RGB平均 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+% ==================================================
+\section{連続フレームへの適用（バレットタイム映像生成）}
+2026-04-10報告資料の「今後の予定」であった連続画像への適用を，
+栖原ロール（前フレームの注視画像を基準とする方式）で実装した．
+
+\subsection{処理パイプライン}
+プログラムは3段階の Python スクリプトと共有ライブラリ \texttt{libomnigaze.so} で構成される．
+\begin{enumerate}
+  \item \textbf{step1\_extract.py} :
+    入力動画（\texttt{Videos/input1.mp4}）から全フレームを
+    \texttt{Videos/frames\_raw/} に保存する．
+    1フレーム目を表示し，ユーザーが注視点$\bm{G}$を1点クリックする．
+    クリック位置を\refeq{eq:image_to_angle}，\refeq{eq:angle_to_world}により世界座標に変換し，
+    \texttt{Videos/gaze.txt} に保存する．
+
+  \item \textbf{step2\_process.py} :
+    各フレームに対して注視画像を生成し，
+    \texttt{Videos/frames\_gaze/}（注視画像），
+    \texttt{Videos/frames\_lined/}（中心線付き）に保存する．
+
+  \item \textbf{step3\_makevideo.py} :
+    \texttt{frames\_gaze} または \texttt{frames\_lined} から出力動画を生成する．
+\end{enumerate}
+
+共有ライブラリは \texttt{make libomnigaze.so} でビルドする．
+
+\subsection{フレームごとの処理}
+\refsubsec{subsec:frame_algo}に，連続フレーム処理の手順を示す．
+
+\subsubsection{フレーム処理アルゴリズム}
+\label{subsec:frame_algo}
+\begin{enumerate}
+  \item \textbf{frame 0} :
+    \begin{itemize}
+      \item $R_0 \leftarrow \texttt{build\_initial\_rotation}(\bm{G})$
+      \item 注視画像$_0 \leftarrow \texttt{warp}(\text{raw}_0, R_0)$
+      \item LM法は実行しない（基準画像と参照画像が同一であるため）
+    \end{itemize}
+
+  \item \textbf{frame $i \geq 1$}（栖原ロール） :
+    \begin{itemize}
+      \item $I_b \leftarrow$ 注視画像$_{i-1}$（前フレームの出力）
+      \item $I_r \leftarrow$ raw$_i$（現フレームの生画像）
+      \item $R_i \leftarrow \texttt{LM}(I_b, I_r, R_{\mathrm{init}} = R_{i-1})$
+      \item 注視画像$_i \leftarrow \texttt{warp}(\text{raw}_i, R_i)$
+    \end{itemize}
+\end{enumerate}
+
+この方式により，frame0で中心に固定した物体が，以降のフレームでも画像中心に留まるバレットタイム映像が得られる．
+LM法の初期値に前フレームの$R$を用いることで，フレーム間の連続した動きを追跡する（2026-04-10 節4.2 項目1と同一方針）．
+
+\subsection{共有ライブラリ API}
+\reftab{tab:api}に，\texttt{libomnigaze.so} の主要 API を示す．
+
+\begin{table}[H]
+  \centering
+  \caption{libomnigaze.so の API}
+  \label{tab:api}
+  \begin{tabular}{l|p{8cm}}
+    \hline
+    関数 & 説明 \\
+    \hline
+    \texttt{get\_gaze\_rotation(G)} & 注視点から$R_0$を計算 \\
+    \texttt{generate\_gaze\_at\_gaze\_point} & $R_0$のみで注視画像を生成（frame0用） \\
+    \texttt{lm\_estimate\_frame} & 基準・参照画像から$R$をLM推定 \\
+    \texttt{generate\_gaze\_frame} & 推定された$R$で注視画像を生成 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+% ==================================================
+\section{実装とプログラム構成}
+\subsection{実験環境}
+\begin{table}[H]
+  \centering
+  \caption{実験環境}
+  \label{tab:environment}
+  \begin{tabular}{l|l}
+    \hline
+    OS & Ubuntu 22.04 LTS \\
+    コンパイラ & GCC \\
+    言語 & C（LM・画像処理），Python 3（パイプライン） \\
+    ライブラリ & OpenCV（Python），ctypes \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{ソースコード構成}
+\reftab{tab:source_tree}に主要なソースファイルを示す．
+
+\begin{table}[H]
+  \centering
+  \caption{ソースコード構成}
+  \label{tab:source_tree}
+  \begin{tabular}{l|p{9cm}}
+    \hline
+    パス & 役割 \\
+    \hline
+    \texttt{src/coord\_transform.c} & 座標変換（\refsec{sec:coord}相当） \\
+    \texttt{experiment/lm\_video.c} & $R_0$構成，LM推定，注視画像生成 API \\
+    \texttt{experiment/objective\_3param.c} & 目的関数，勾配，ヘッセ，ロドリゲス \\
+    \texttt{experiment/step1\_extract.py} & フレーム抽出，注視点指定 \\
+    \texttt{experiment/step2\_process.py} & LM + 注視画像のバッチ処理 \\
+    \texttt{experiment/step3\_makevideo.py} & 動画出力 \\
+    \texttt{experiment/common.py} & 座標変換（Python），ctypes 定義 \\
+    \texttt{build/libomnigaze.so} & 共有ライブラリ（ビルド成果物） \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{ビルドと実行}
+\begin{enumerate}
+  \item \texttt{make libomnigaze.so}
+  \item \texttt{python3 experiment/step1\_extract.py}
+  \item \texttt{python3 experiment/step2\_process.py}
+  \item \texttt{python3 experiment/step3\_makevideo.py}
+\end{enumerate}
+デバッグ用に \texttt{FRAME\_LIMIT=N} 環境変数で処理フレーム数を制限できる．
+
+% ==================================================
+\section{ゼミ報告資料との相違点}
+本節では，2026-02-13および2026-04-10の報告資料と本プログラムの相違点を明示する．
+意図的な設計判断であるものには理由を併記する．
+
+\subsection{補助点$\bm{G}_s$を使用しない}
+\label{subsec:diff_gs}
+\begin{itemize}
+  \item \textbf{報告資料（2026-02-13）} :
+    注視点$\bm{G}$と補助点$\bm{G}_s$の2点指定により
+    $\bm{e}_y = N[\bm{G} \times \bm{G}_s]$，$\bm{e}_x = \bm{e}_y \times \bm{e}_z$とする．
+  \item \textbf{本プログラム} :
+    注視点$\bm{G}$の1点指定のみ．
+    $\bm{up} = (0,1,0)^\top$を基準として\refeq{eq:ex_impl}，\refeq{eq:ey_impl}で軸を決定する．
+  \item \textbf{理由} :
+    UIを1点クリックに簡略化するため．
+    ロール角（画像の傾き）は$\bm{up}$により一意に定まる．
+\end{itemize}
+
+\subsection{画像生成の写像方向}
+\label{subsec:diff_render}
+\begin{itemize}
+  \item \textbf{報告資料（2026-02-13）} :
+    出力から入力への対応に$R^\top$を用いる（\refeq{eq:inverse_transform_paper}）．
+  \item \textbf{本プログラム} :
+    \refeq{eq:forward_render}のとおり$R$を用いる．
+  \item \textbf{理由} :
+    LM法の目的関数（\refeq{eq:rotation}）も$\bm{X}' = R\bm{X}$であり，
+    推定と描画で同じ向きを用いる必要がある．
+    旧実装で$R^\top$と$R$が混在していたとき，frame1以降で注視点が中心からずれる問題が発生した．
+    $R_0$は列ベクトル形式$[\bm{e}_x\ \bm{e}_y\ \bm{e}_z]$として格納し，
+    $R_0\bm{e}_z = \bm{G}$が成り立つようにしている．
+\end{itemize}
+
+\subsection{その他の相違点}
+\reftab{tab:diff_summary}にまとめる．
+
+\begin{table}[H]
+  \centering
+  \caption{報告資料との相違点一覧}
+  \label{tab:diff_summary}
+  \begin{tabular}{p{3.2cm}|p{4.5cm}|p{4.5cm}}
+    \hline
+    項目 & 報告資料 & 本プログラム \\
+    \hline
+    比較領域 &
+      小領域 $380 \times 190$ &
+      同比率の半分（中心追従を優先） \\
+    連続フレーム &
+      2026-04-10時点では未実装 &
+      栖原ロールで実装済み \\
+    透視投影クリップ &
+      池内手法ではクリップ出力あり &
+      全天球注視画像のみ（クリップなし） \\
+    libteo &
+      （別プロジェクトで同梱例あり） &
+      計算には未使用 \\
+    入力画像 &
+      検証時はグレースケール &
+      RGB（輝度は3チャンネル平均） \\
+    \texttt{rotation.c} &
+      行ベクトル形式の$R$定義 &
+      LM/描画パスでは\texttt{lm\_video.c}の列形式を使用 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+% ==================================================
+\section{まとめ}
+\begin{itemize}
+  \item 2026-02-13報告資料の座標変換と回転行列による注視画像生成の考え方に基づき，
+    2026-04-10報告資料の3パラメータLM推定を実装した．
+
+  \item 連続フレームには栖原ロール（前フレーム注視画像を基準，前フレーム$R$を初期値）を適用し，
+    バレットタイム映像生成パイプラインとして動作する．
+
+  \item 報告資料との主な相違は，
+    （1）補助点$\bm{G}_s$不使用，
+    （2）LMと描画で$R$の向きを統一した点，
+    （3）比較領域サイズ等の実装パラメータである．
+\end{itemize}
+
+% ==================================================
+\begin{thebibliography}{99}
+  \bibitem{bib_1}  菅谷保之, ''全方位画像を入力とした注視画像生成'', 研究室内資料（最終更新2024年12月18日）
+
+  \bibitem{bib_2} 池内 華奈, ''全方位画像からの歪みを考慮した画像探索による注視画像生成'', 卒業論文, 豊橋技術科学大学 情報・知能工学課程, 2024
+\end{thebibliography}
+
+\end{document}

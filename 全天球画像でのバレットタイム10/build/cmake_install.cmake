@@ -1,4 +1,4 @@
-# Install script for directory: /home/h233304/全天球画像でのバレットタイム10
+# Install script for directory: /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,7 +44,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/h233304/全天球画像でのバレットタイム10/build/src/cmake_install.cmake")
+  include("/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/build/src/cmake_install.cmake")
 
 endif()
 
@@ -56,5 +56,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/h233304/全天球画像でのバレットタイム10/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

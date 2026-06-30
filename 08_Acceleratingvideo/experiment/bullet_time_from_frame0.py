@@ -98,58 +98,49 @@ def main():
     frame_paths.insert(0, frame0_abs)
     total = len(frame_paths)
 
-    # 基準画像 Ib: frame0 を注視点中心にしたフルサイズ画像(固定)
-    Ib_path = os.path.join(args.out_dir, 'Ib.jpg')
-    print(f'[Ib 生成] 第0フレームを G 方向中心に回転した全天球基準画像')
-    print(f'  → {Ib_path}')
-    try:
-        omnigaze.generate_gaze_full_world(frame0_abs, Ib_path, Gx, Gy, Gz, make_identity_R())
-        draw_centerlines(Ib_path)
-        print('  → Ib_centerline.jpg も生成 (中心に注視点が来ているか確認用)\n')
-    except Exception as e:
-        print('  Ib 生成失敗:', e)
-        return
-
     print(f'フレーム一覧: {total} フレーム (frame0 先頭固定)\n')
 
-    base_path = Ib_path
-    R_prev = make_identity_R()
+    # --- frame 0: 注視方向から初期 R を計算し、フルサイズ注視画像を生成 ---
+    # 論文方式: R は注視点を中心にする完全な回転行列として単一管理。
+    # 初期値は build_R_gaze(G) と同一の計算（LM 不要）。
+    print(f'[フレーム  0/{total-1}] 注視方向から初期 R を計算 (LM不要)')
+    try:
+        R_prev = omnigaze.compute_R_from_gaze_world(Gx, Gy, Gz)
+        gaze0_path = os.path.join(args.out_dir, os.path.basename(frame_paths[0]))
+        omnigaze.generate_gaze_full_single_R(frame_paths[0], gaze0_path, R_prev)
+        draw_centerlines(gaze0_path)
+        prev_gaze_path = gaze0_path
+        print(f'✓ {os.path.basename(frame_paths[0])}\n')
+    except Exception as e:
+        print(f'  frame0 処理失敗: {e}')
+        return
+
     start_all = time.perf_counter()
 
-    for i, fp in enumerate(frame_paths):
+    # --- frame 1 以降: 前フレームの注視画像を基準画像 Ib、前フレームの R を初期値として LM ---
+    for i, fp in enumerate(frame_paths[1:], 1):
         fname = os.path.basename(fp)
         outp = os.path.join(args.out_dir, fname)
         t_start = time.perf_counter()
 
-        if i == 0:
-            print(f'[フレーム  0/{total-1}] frame0 (LM不要・R_cum = 単位行列)')
-            try:
-                omnigaze.generate_gaze_frame_world(fp, outp, Gx, Gy, Gz, make_identity_R())
-                draw_centerlines(outp)
-            except Exception as e:
-                print(f'  生成失敗: {e}')
-            R_prev = make_identity_R()
-            t_ms = (time.perf_counter() - t_start) * 1000
-            print(f'✓ {fname}  [{t_ms:.0f}ms]\n')
-            continue
-
-        print(f'[フレーム {i:2d}/{total-1}] LM最適化中 (基準画像=Ib, 参照=現フレーム)')
+        print(f'[フレーム {i:2d}/{total-1}] LM最適化中 (基準画像=前フレーム注視画像, 参照=現フレーム)')
         sys.stdout.flush()
         try:
-            R = omnigaze.lm_estimate_frame(base_path, fp, R_prev, sigma=args.sigma)
+            R = omnigaze.lm_estimate_frame(prev_gaze_path, fp, R_prev, sigma=args.sigma)
             # ↑ C側から "[LM] iters=... E_init=... E_final=... dE=... converged=..." が出力される
-            print(f'  R_cum[:3] (推定累積回転行列の先頭3成分): {[f"{v:.5f}" for v in R[:3]]}')
+            print(f'  R[:3] (推定回転行列の先頭3成分): {[f"{v:.5f}" for v in R[:3]]}')
         except Exception as e:
-            print(f'  LM失敗 ({e})、前フレームの R_cum を流用')
+            print(f'  LM失敗 ({e})、前フレームの R を流用')
             R = R_prev
 
         try:
-            omnigaze.generate_gaze_frame_world(fp, outp, Gx, Gy, Gz, R)
+            omnigaze.generate_gaze_full_single_R(fp, outp, R)
             draw_centerlines(outp)
         except Exception as e:
             print(f'  注視画像生成失敗: {e}')
 
         R_prev = R
+        prev_gaze_path = outp
         t_ms = (time.perf_counter() - t_start) * 1000
         print(f'✓ {fname}  [{t_ms:.0f}ms]\n')
 

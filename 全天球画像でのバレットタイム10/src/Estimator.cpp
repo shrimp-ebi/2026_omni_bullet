@@ -233,8 +233,11 @@ namespace spherical_bullet_time{
         cv::Mat diff_image_z;
         make_differential_image(img_in, diff_image_x, diff_image_y, diff_image_z);
 
+        const int max_outer_iter = 300;
+        const int max_inner_iter = 50;
         int count=0;
-        while(true) {
+        int outer_iter = 0;
+        while(outer_iter++ < max_outer_iter) {
             // ========================================
             // 回転行列の微分行列を生成
             // ========================================
@@ -315,10 +318,9 @@ namespace spherical_bullet_time{
             cv::Mat R_new;
             double sum_of_error_new;
 
-            cv::Mat rotated_img_new = cv::Mat(comp_range_cartesian_.rows, comp_range_cartesian_.cols, CV_8U);
-
             // lambda値を調整しながら適切な更新を探す
-            while(true) {
+            int inner_iter = 0;
+            while(inner_iter++ < max_inner_iter) {
                 cv::Mat hesse_cp = hesse.clone();
 
                 // LM法：ヘッセ行列の対角成分にlambda*Iを加算（正則化）。
@@ -363,9 +365,6 @@ namespace spherical_bullet_time{
                         // 誤差計算
                         double error = img_in.ptr<uint8_t>(uv_out[1])[uv_out[0]] - base_clip.ptr<uint8_t>(xy_in_2[1])[xy_in_2[0]];
                         sum_of_error_new += error*error;
-
-                        // 回転後画像の画素値を保存
-                        rotated_img_new.ptr<uint8_t>(uv_out[1])[uv_out[0]] = img_in.ptr<uint8_t>(uv_out[1])[uv_out[0]];
                     }
                 }
                 sum_of_error_new /= num_of_clip_pixel_;
@@ -403,6 +402,8 @@ namespace spherical_bullet_time{
             // 次のイテレーションではlambdaを減少（より大きい更新を試す）
             lambda /= 10;
         }
+        // 最大反復回数に達した場合は現在のRを返す
+        return R;
     }
 
 

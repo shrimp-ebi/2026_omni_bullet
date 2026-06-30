@@ -1,4 +1,4 @@
-# Install script for directory: /home/h233304/全天球画像でのバレットタイム10/src
+# Install script for directory: /home/y233324/ドキュメント/2026_注視画像生成/Code/2026_omni_bullet/全天球画像でのバレットタイム10/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
